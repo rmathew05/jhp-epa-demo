@@ -275,7 +275,7 @@
       </div>
 
       <h3 class="sec">Clinical Criteria Engine</h3>
-      <div class="um criteria-box" id="criteria"><b>Clinical Criteria</b><span class="role" id="criteriaRole">InterQual · NCCN Compendium · Helios LTSS — evidence-based medical-necessity rules the UM vendor checks before adjudicating</span></div>
+      <div class="um criteria-box" id="criteria"><b>Clinical Criteria — InterQual</b><span class="role" id="criteriaRole">Evidence-based medical-necessity criteria — checked by MHK before adjudicating</span></div>
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex or IHE</h3>
       <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
@@ -703,10 +703,11 @@ function clearFlows(){ flows=[]; renderFlows(); }
 //   Epic provider     -> via EPP
 //   eCW/Oracle provider -> via eHealth Exchange proxy SMART-on-FHIR
 async function flowDecision(s,color){
-  addFlow("#um-"+s.um,"#um-router",color); await gate(500);
-  if(s.epp){ $("net-epp").classList.add("routed"); addFlow("#um-router","#net-epp",color); await gate(500); addFlow("#net-epp","#ehrDecision",color); }
-  else { $("net-ehx").classList.add("routed"); addFlow("#um-router","#net-ehx",color); await gate(500); addFlow("#net-ehx","#ehrDecision",color); }
-  await gate(450);
+  // final push from PAS into the EMR — EPP for Epic, eHealth Exchange proxy for non-Epic
+  const net = s.epp ? "net-epp" : "net-ehx";
+  $(net).classList.add("routed");
+  addFlow("#api-pas","#"+net,color); await gate(500);
+  addFlow("#"+net,"#ehrDecision",color); await gate(450);
   addFlow("#api-pas","#ms-3",C_MEM);
 }
 function clipToRect(cx,cy,hw,hh,dx,dy){
@@ -858,10 +859,7 @@ function openDtr(){
   const s=state.s;
   setApi("dtr","active");
   addFlow("#api-crd","#api-dtr",C_API);
-  // DTR Documentation Templates & Rules are authored by the delegated UM vendor
-  $("um-"+s.um).classList.add("routed");
-  addFlow("#api-dtr","#um-"+s.um,C_UM);
-  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR retrieves <b>${s.umName}</b> Questionnaire + CQL prefill rules (Documentation Templates &amp; Rules)`);
+  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR retrieves Questionnaire + CQL prefill rules (Documentation Templates &amp; Rules)`);
   $("dtrTitle").textContent=`DTR — ${s.label}`;
   let html="";
   s.questionnaire.forEach(q=>{
@@ -897,31 +895,17 @@ async function submitDtr(){
   $("dtrStatus").innerHTML=`<div class="card"><b>📋 DTR complete</b><p style="margin:4px 0 0">Documentation packaged with the PA request.</p></div>`;
   await gate(500);
 
-  // PAS
-  setApi("pas","active");
-  addFlow("#api-dtr","#api-pas",C_API);
-  const paId="PA-"+Math.floor(100000+Math.random()*900000);
-  state.paId=paId;
-  if(s.epp) addFlow("#api-pas","#net-epp",C_UM);
-  if(s.epp){
-    trace(`<span class="sys">[Epic→EPP→PAS]</span> PA submitted natively from <b>Epic</b> via <b>Epic Payer Platform (EPP)</b> · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
-    $("net-epp").classList.add("routed");
-  } else {
-    trace(`<span class="sys">[EHR→PAS]</span> Claim/$submit · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
-  }
-  addQueue(paId, s, "Received");
-  await gate(900);
-
-  // routing via JHP ePA Router (SMART on FHIR orchestrator)
-  trace(`<span class="sys">[PAS→Router]</span> <b>JHP ePA Router</b> (SMART on FHIR) orchestrates · routes ${s.code} to <b>${s.umName}</b> (${s.umRole})`);
+  // After DTR → JHP ePA Router (SMART on FHIR orchestrator)
   $("um-router").classList.add("routed");
-  addFlow("#api-pas","#um-router",C_UM);
+  addFlow("#api-dtr","#um-router",C_UM);
+  trace(`<span class="sys">[DTR→Router]</span> <b>JHP ePA Router</b> (SMART on FHIR) orchestrates the request`);
   await gate(700);
+
+  // Router → delegated UM vendor
   $("um-"+s.um).classList.add("routed");
   addFlow("#um-router","#um-"+s.um,C_UM);
-  updateQueue(paId, `Routed → ${s.umName}`, "");
-  memberStep(2);
-  await gate(1100);
+  trace(`<span class="sys">[Router→${s.umName}]</span> routes ${s.code} to <b>${s.umName}</b> (${s.umRole}) for adjudication`);
+  await gate(1000);
 
   // outcome
   let outcome="approve";
@@ -932,53 +916,61 @@ async function submitDtr(){
     else outcome = (a==="Yes") ? driver.yes : driver.no;
   }
 
-  // Clinical criteria review (InterQual for MHK, NCCN pathways for oncology, Helios for LTSS)
-  if(s.interqual){
-    const eng = s.interqual.engine || "InterQual";
-    // light the criteria engine box, label it with the active rule set, and connect the vendor to it
+  // Clinical criteria review — MHK / InterQual only
+  if(s.um==="mhk" && s.interqual){
     $("criteria").classList.add("routed");
-    $("criteriaRole").innerHTML = `<b style="color:var(--ink)">${eng}</b> · ${s.interqual.set} — consulted by ${s.umName}`;
+    $("criteriaRole").innerHTML = `<b style="color:var(--ink)">InterQual</b> · ${s.interqual.set} — consulted by ${s.umName}`;
     addFlow("#um-"+s.um, "#criteria", C_OK);
-    trace(`<span class="sys">[${s.umName}→${eng}]</span> Auto-review against <b>${s.interqual.set}</b>`);
+    trace(`<span class="sys">[${s.umName}→InterQual]</span> Auto-review against <b>${s.interqual.set}</b>`);
     await gate(700);
     s.interqual.criteria.forEach(cr=>{
       const fail = outcome!=="approve" && cr.key;
       trace(fail
-        ? `<span class="err">[${eng}]</span> ✗ ${cr.c} — <b>not documented</b>`
-        : `<span class="ok">[${eng}]</span> ✓ ${cr.c} — met`);
+        ? `<span class="err">[InterQual]</span> ✗ ${cr.c} — <b>not documented</b>`
+        : `<span class="ok">[InterQual]</span> ✓ ${cr.c} — met`);
     });
     await gate(700);
     addFlow("#criteria", "#um-"+s.um, outcome==="approve"?C_OK:C_WARN);
     trace(outcome==="approve"
-      ? `<span class="ok">[${eng}→${s.umName}]</span> All criteria MET → auto-approval, no manual review`
-      : `<span class="warn">[${eng}→${s.umName}]</span> Criteria NOT met → cannot auto-approve`);
+      ? `<span class="ok">[InterQual→${s.umName}]</span> All criteria MET → auto-approval, no manual review`
+      : `<span class="warn">[InterQual→${s.umName}]</span> Criteria NOT met → cannot auto-approve`);
     await gate(500);
   }
 
+  // Vendor → PAS (standardized prior-authorization response)
+  setApi("pas","active");
+  const paId="PA-"+Math.floor(100000+Math.random()*900000);
+  state.paId=paId;
+  addFlow("#um-"+s.um,"#api-pas",C_API);
+  addQueue(paId, s, "Received");
+  trace(`<span class="sys">[${s.umName}→PAS]</span> adjudication complete · PAS prepares standardized response (X12 278 / FHIR ClaimResponse) · id ${paId}`);
+  updateQueue(paId, `Adjudicated → ${s.umName}`, "");
+  memberStep(2);
+  await gate(900);
   setApi("pas","done");
   if(outcome==="approve"){
-    trace(`<span class="ok">[${s.umName}→Router]</span> ClaimResponse: <b>APPROVED</b> · Auth # ${s.approve.auth} · returned in seconds, not days`);
+    trace(`<span class="ok">[PAS]</span> ClaimResponse: <b>APPROVED</b> · Auth # ${s.approve.auth} · returned in seconds, not days`);
     updateQueue(paId, "Approved", "appr");
     trace(s.epp
-      ? `<span class="ok">[Router→EPP→Epic]</span> Writing approved authorization back into <b>Epic</b> via EPP (final push)`
-      : `<span class="ok">[Router→eHX→${s.emr}]</span> Writing approved authorization back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
-    $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b><p style="margin:4px 0 0">Router writing the authorization back via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}.</p></div>`;
+      ? `<span class="ok">[PAS→EPP→Epic]</span> Writing approved authorization back into <b>Epic</b> via EPP (final push)`
+      : `<span class="ok">[PAS→eHX→${s.emr}]</span> Writing approved authorization back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
+    $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b><p style="margin:4px 0 0">PAS writing the authorization back via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}.</p></div>`;
     await flowDecision(s, C_OK);
     $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED</span>
       <h4 style="margin-top:8px">Prior authorization approved</h4>
       <div class="kv">Authorization #: <span>${s.approve.auth}</span></div>
       <div class="kv">${s.approve.note}</div>
-      ${s.interqual?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
-      <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → Router → ${s.epp?"EPP":"eHX"} → EHR.</div></div>`;
+      ${(s.um==="mhk"&&s.interqual)?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
+      <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → Router → ${s.umName} → PAS → ${s.epp?"EPP":"eHX"} → EHR.</div></div>`;
     renderFlows();
     memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
     bumpMetric("touchless");
   } else if(outcome==="pend"){
     const reason = driver?.pendReason || "Pended for clinical review.";
     const ref = s.pend?.ref || "RV-"+Math.floor(10000+Math.random()*90000);
-    trace(`<span class="warn">[${s.umName}→Router]</span> ClaimResponse: <b>PENDED</b> · ${reason}`);
+    trace(`<span class="warn">[PAS]</span> ClaimResponse: <b>PENDED</b> · ${reason}`);
     updateQueue(paId, "Pended — clinical review", "pend");
-    trace(`<span class="warn">[Router→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Pend decision returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
+    trace(`<span class="warn">[PAS→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Pend decision returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
     $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b></div>`;
     await flowDecision(s, C_WARN);
     $("ehrDecision").innerHTML=`<div class="decision pend"><span class="badge pend">PENDED</span>
@@ -991,9 +983,9 @@ async function submitDtr(){
     memberDecision("pend", s);
     bumpMetric("pend");
   } else {
-    trace(`<span class="err">[${s.umName}→Router]</span> ClaimResponse: <b>DENIED</b> · reason code + policy citation returned (CMS-0057 specific-reason requirement)`);
+    trace(`<span class="err">[PAS]</span> ClaimResponse: <b>DENIED</b> · reason code + policy citation returned (CMS-0057 specific-reason requirement)`);
     updateQueue(paId, "Denied", "den");
-    trace(`<span class="err">[Router→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Denial + specific reason returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
+    trace(`<span class="err">[PAS→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Denial + specific reason returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
     $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b></div>`;
     await flowDecision(s, C_DEN);
     $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span>
@@ -1037,24 +1029,23 @@ async function cdexFlow(){
   updateQueue(paId, "Re-adjudicating", "req");
   setApi("pas","active");
   await gate(1100);
-  if(s.interqual){
-    const eng = s.interqual.engine || "InterQual";
+  if(s.um==="mhk" && s.interqual){
     $("criteria").classList.add("routed");
     addFlow("#um-"+s.um, "#criteria", C_OK);
-    trace(`<span class="sys">[${s.umName}→${eng}]</span> ${eng} re-review with retrieved documentation · ${s.interqual.set}`);
+    trace(`<span class="sys">[${s.umName}→InterQual]</span> InterQual re-review with retrieved documentation · ${s.interqual.set}`);
     await gate(700);
     addFlow("#criteria", "#um-"+s.um, C_OK);
-    trace(`<span class="ok">[${eng}→${s.umName}]</span> All criteria now MET → auto-approval`);
+    trace(`<span class="ok">[InterQual→${s.umName}]</span> All criteria now MET → auto-approval`);
     await gate(500);
   }
   setApi("pas","done");
 
   const auth=c.authPrefix+"-CDX-"+Math.floor(10000+Math.random()*90000);
-  trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth} · documentation gap closed via network query — no fax, no portal, no phone call`);
+  trace(`<span class="ok">[${s.umName}→PAS]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth} · documentation gap closed via network query — no fax, no portal, no phone call`);
   updateQueue(paId, "Approved via CDex", "appr");
   trace(s.epp
-    ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
-    : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
+    ? `<span class="ok">[PAS→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
+    : `<span class="ok">[PAS→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
   await flowDecision(s, C_OK);
   $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span>
     <h4 style="margin-top:8px">Prior authorization approved after CDex record retrieval</h4>
@@ -1086,7 +1077,7 @@ function resetFlow(){
   ["net-ehx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
-  const cr=$("criteriaRole"); if(cr) cr.textContent="InterQual · NCCN Compendium · Helios LTSS — evidence-based medical-necessity rules the UM vendor checks before adjudicating";
+  const cr=$("criteriaRole"); if(cr) cr.textContent="Evidence-based medical-necessity criteria — checked by MHK before adjudicating";
   clearFlows();
   clearGate();
   memberReset();
