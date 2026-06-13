@@ -33,7 +33,10 @@
   .panel-head{padding:12px 16px; min-height:64px; display:flex; flex-direction:column; justify-content:center; gap:3px;}
   .panel-head .ttl{font-weight:700; font-size:13px; letter-spacing:.4px; text-transform:uppercase; display:flex; align-items:center; gap:7px;}
   .panel-head .sub{font-weight:400; letter-spacing:0; color:rgba(255,255,255,.82); font-size:11.5px; line-height:1.35;}
-  .ehr .panel-head{background:#7a1f2b; color:#fff;}
+  .ehr .panel-head{background:#7a1f2b; color:#fff; transition:background .35s;}
+  .ehr-ribbon{display:none; font-size:11px; font-weight:600; padding:6px 16px; letter-spacing:.3px; border-bottom:1px solid var(--line);}
+  .ehr-ribbon.on{display:block;}
+  #ehrPanel{transition:border-color .35s, box-shadow .35s;}
   .payer .panel-head{background:var(--jhp-blue-dark); color:#fff;}
   .panel-body{padding:16px; flex:1;}
   .pt-banner{background:#f4f7fa; border:1px solid var(--line); border-radius:8px; padding:10px 14px; display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;}
@@ -203,8 +206,9 @@
 <div class="layout">
 
   <!-- PROVIDER EHR -->
-  <div class="panel ehr">
-    <div class="panel-head"><span class="ttl">🏥 Provider EHR System Workflow</span><span class="sub">Epic / eCW / Oracle · SMART on FHIR flow</span></div>
+  <div class="panel ehr" id="ehrPanel">
+    <div class="panel-head" id="ehrHead"><span class="ttl" id="ehrTtl">🏥 Provider EHR System Workflow</span><span class="sub" id="ehrSub">Epic / eCW / Oracle · SMART on FHIR flow</span></div>
+    <div class="ehr-ribbon" id="ehrRibbon"></div>
     <div class="panel-body">
       <div class="pt-banner">
         <div><b>Maria Gonzalez</b><div class="kv">DOB <span>03/14/1968</span> · F · 58y</div></div>
@@ -694,6 +698,33 @@ const SCEN = {
 let state = null;
 const $ = id => document.getElementById(id);
 
+/* ---------- EMR SKIN: restyle the provider panel to mimic the real EHR ---------- */
+const EMR_THEME = {
+  Epic:   {head:"#1a4f8b", head2:"#5cb85c", wordmark:"⬢ Epic", sub:"Hyperspace · SMART on FHIR", accent:"#1a4f8b", tint:"#eef4fb",
+           ribbon:"Snapshot · Chart Review · Orders · Results · Notes · In Basket"},
+  eCW:    {head:"#173E58", head2:"#FF9900", wordmark:"eClinicalWorks", sub:"eCW · SMART on FHIR", accent:"#173E58", tint:"#eef3f7",
+           ribbon:"Hub · Progress Notes · Orders · Labs · Telephone · Documents"},
+  Oracle: {head:"#C74634", head2:"#3a3f44", wordmark:"ORACLE Health", sub:"PowerChart (Cerner) · SMART on FHIR", accent:"#C74634", tint:"#fbeeec",
+           ribbon:"PowerChart · Documentation · Orders · Results Review · Med List · Message Center"},
+};
+function applyEmrSkin(emr){
+  const t = EMR_THEME[emr];
+  const head=$("ehrHead"), panel=$("ehrPanel"), rb=$("ehrRibbon");
+  if(!t){ // neutral default
+    head.style.background=""; $("ehrTtl").textContent="🏥 Provider EHR System Workflow";
+    $("ehrSub").textContent="Epic / eCW / Oracle · SMART on FHIR flow";
+    panel.style.borderColor=""; panel.style.boxShadow=""; rb.className="ehr-ribbon"; return;
+  }
+  head.style.background=`linear-gradient(100deg, ${t.head} 0%, ${t.head} 60%, ${t.head2} 100%)`;
+  $("ehrTtl").textContent=t.wordmark;
+  $("ehrSub").textContent=`${t.sub} · Provider EHR workflow`;
+  panel.style.borderColor=t.accent;
+  panel.style.boxShadow=`0 0 0 2px ${t.accent}22`;
+  rb.className="ehr-ribbon on"; rb.style.background=t.tint; rb.style.color=t.accent; rb.style.borderColor=t.accent+"44";
+  rb.textContent=t.ribbon;
+}
+function skinForCurrentOrder(){ const s=SCEN[$("orderSel").value]; applyEmrSkin(s?s.emr:null); }
+
 /* ---------- FLOW CONNECTOR LINES ---------- */
 const SVGNS="http://www.w3.org/2000/svg";
 let flows=[]; // {fromSel,toSel,color}
@@ -1089,6 +1120,7 @@ function resetDemo(){
   el.innerHTML='<span class="t">—</span> Waiting for activity. Sign an order in the EHR to begin.';
   $("signBtn").disabled=false;
   metrics.total=metrics.touchless=metrics.cdex=metrics.savedHrs=0; renderMetrics();
+  skinForCurrentOrder();
 }
 
 /* ---------- GUIDED DEMO ---------- */
@@ -1151,6 +1183,10 @@ async function narAdvance(){
 }
 // voices load asynchronously in some browsers
 if(synth) synth.onvoiceschanged = ()=>{};
+
+/* EMR skin: restyle the provider EHR panel when a new order is selected */
+$("orderSel").addEventListener("change", skinForCurrentOrder);
+skinForCurrentOrder();
 </script>
 </body>
 </html>
