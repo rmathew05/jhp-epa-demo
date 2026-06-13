@@ -144,6 +144,32 @@
   .flow-path{fill:none; stroke-width:2.5; stroke-linecap:round; stroke-dasharray:7 6; animation:dashflow .7s linear infinite; opacity:.9;}
   @keyframes dashflow{to{stroke-dashoffset:-13;}}
   @media (max-width:1100px){.layout{grid-template-columns:1fr;} .metrics{grid-template-columns:repeat(2,1fr);} #flowLayer{display:none;}}
+  @media (max-width:600px){
+    body{font-size:13.5px;}
+    header{flex-wrap:wrap; gap:7px 10px; padding:9px 12px;}
+    header .logo{font-size:15px; width:100%;}
+    header .tag{font-size:10px; padding:2px 8px;}
+    header .reset{margin-left:auto;}
+    .btn{padding:7px 12px; font-size:12.5px;}
+    .metrics{margin-top:10px; padding:0 10px; gap:8px;}
+    .metric{padding:10px 11px;}
+    .metric .v{font-size:19px;} .metric .l{font-size:9.5px; letter-spacing:.2px;} .metric .delta{font-size:9.5px;}
+    .layout{padding:10px; gap:10px;}
+    .panel{min-height:auto;}
+    .panel-head{min-height:auto; padding:10px 13px;}
+    .panel-body{padding:13px;}
+    .pt-banner{gap:10px 14px; padding:9px 11px;}
+    .order-row{flex-wrap:wrap;}
+    .order-row select{flex:1 1 100%;}
+    .order-row .btn{flex:1 1 100%;}
+    .api-rail{gap:6px;}
+    .api{padding:8px 6px;} .api .nm{font-size:13px;} .api .ds{font-size:9px; line-height:1.15;}
+    .um-grid{grid-template-columns:repeat(2,1fr) !important;}
+    .trace-wrap{padding:0 10px;}
+    .trace{max-height:200px;}
+    .narrator{left:8px; right:8px; bottom:8px; width:auto;}
+    .modal-body{padding:15px;}
+  }
 </style>
 </head>
 <body>
