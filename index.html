@@ -1130,6 +1130,23 @@ function resetDemo(){
 }
 
 /* ---------- GUIDED DEMO ---------- */
+// answer every non-text DTR question; the driver is forced to its non-approve outcome
+function autoAnswerDtr(key){
+  const s=SCEN[key]; if(!s||!s.questionnaire) return;
+  s.questionnaire.forEach(q=>{
+    if(q.type==="text") return;
+    let val;
+    if(q.drives){
+      if(q.type==="yn") val = (q.yes==="approve") ? "No" : "Yes"; // force the non-approve branch
+      else if(q.type==="choice") val = q.opts.find(o=>(q.map?q.map[o]:null)!=="approve") || q.opts[0];
+    } else {
+      val = q.type==="yn" ? "Yes" : q.opts[0];
+    }
+    const btns=[...document.querySelectorAll(`[data-q="${q.id}"] button`)];
+    const target = btns.find(b=>b.textContent.trim()===val) || btns[0];
+    if(target) pick(q.id, val, target);
+  });
+}
 const TOUR = [
   {title:"Welcome", body:"This walks through Jefferson Health Plans' electronic prior auth using Da Vinci <b>CRD → DTR → PAS</b>, with <b>InterQual</b> criteria and <b>CDex</b> record retrieval. Three panels: provider EHR, payer hub, and the member's app.",
    say:"Welcome. This demo walks through Jefferson Health Plans' electronic prior authorization, built on the Da Vinci standards: C R D, D T R, and P A S, with InterQual criteria and CDex record retrieval. You'll see three panels: the provider's E H R on the left, the payer hub in the center, and the member's app on the right.", action:()=>{ resetDemo(); }},
@@ -1140,13 +1157,13 @@ const TOUR = [
   {title:"DTR auto-fills the documentation", body:"Launching <b>DTR</b> opens a SMART on FHIR questionnaire. Most fields are <b>prefilled from the chart via CQL</b>. We'll answer the driving question to trigger a denial path first, then rescue it with CDex.",
    say:"Launching D T R opens a SMART on FHIR questionnaire. Most fields are pre-filled straight from the chart using C Q L logic. We'll answer the key question to trigger a denial first, then rescue it with CDex.", action:()=>{ openDtr(); }},
   {title:"Answer to force a gap", body:"We'll answer <b>No</b> to 'completed conservative therapy' — simulating documentation that lives at another provider. Then submit to PAS.",
-   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ pick('cons','No', document.querySelector('[data-q=cons] button:nth-child(2)')); await gate(400); await submitDtr(); }},
+   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ autoAnswerDtr('mri'); await sleep(500); await submitDtr(); }},
   {title:"Denied — with a specific reason", body:"PAS routed to <b>eviCore</b> and returned a <b>denial with the exact policy citation</b> (CMS-0057 requires specific reasons). The member app (right) shows the status and appeal rights. Now click the CDex button.",
    say:"P A S routed the request to eviCore, which returned a denial with the exact policy citation. C M S rule fifty-seven requires a specific reason. The member app on the right shows the status and appeal rights. Now let's use CDex.", action:async()=>{ if($("cdexBtn")){ await cdexFlow(); } }},
   {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>eHealth Exchange</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
    say:"The hub issued a CDex task, found the patient over the eHealth Exchange network, pulled the physical therapy records from Rothman's E H R, attached them, and re-adjudicated to approved. No fax, no phone call. Watch the metrics bar update at the top.", action:()=>{}},
-  {title:"That's the story", body:"Order → CRD → DTR → PAS → InterQual → decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios — each routes to a different delegated vendor.",
-   say:"That's the full story: order, to C R D, to D T R, to P A S, through InterQual, to a decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios. Each one routes to a different delegated vendor.", action:()=>{ endGuided(); }}
+  {title:"That's the story", body:"Order → CRD → DTR → <b>Router</b> → eviCore → PAS → eHealth Exchange → decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios — each routes to a different delegated vendor (MHK runs InterQual, pharmacy runs ESI / CMS-0062, and so on).",
+   say:"That's the full story: order, to C R D, to D T R, to the J H P ePA Router, to eviCore, to P A S, written back into the E H R, all surfaced to the member in real time. Try the other scenarios. Each one routes to a different delegated vendor.", action:()=>{ endGuided(); }}
 ];
 let tourIdx=-1, tourBusy=false;
 let voiceOn = ('speechSynthesis' in window);
