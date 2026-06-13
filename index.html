@@ -229,12 +229,12 @@
           <option value="imrt">🩻 IMRT Radiation Therapy — CPT 77385</option>
           <option value="genomic">🩻 Comprehensive Genomic Profiling — CPT 81455</option>
           <option value="cmr">🩻 Cardiac MRI — CPT 75561</option>
-          <option value="hha">🏥 Skilled Home Health — HCPCS G0299</option>
           </optgroup>
           <optgroup label="──  eCW  (write-back via eHealth Exchange)  ──">
           <option value="mri">🩻 MRI Lumbar Spine w/o contrast — CPT 72148</option>
           <option value="dental">🦷 Dental Crown, porcelain/ceramic — D2740</option>
           <option value="tka">🩻 Total Knee Arthroplasty — CPT 27447</option>
+          <option value="hha">🏥 Skilled Home Health — HCPCS G0299</option>
           <option value="humira">💊 Humira (adalimumab) — Rx · pharmacy</option>
           <option value="pcs">🏠 Personal Care Services — HCPCS T1019</option>
           </optgroup>
@@ -620,13 +620,13 @@ const SCEN = {
       authPrefix:"EVC", note:"Echo with reduced EF retrieved from Epic via EPP — cardiac MRI approved on re-adjudication."}
   },
   hha: {
-    label:"Skilled Home Health (Epic)", code:"HCPCS G0299", paRequired:true, epp:true, emr:"Epic",
+    label:"Skilled Home Health (eCW)", code:"HCPCS G0299", paRequired:true, emr:"eCW",
     um:"mhk", umName:"MHK", umRole:"Core UM / Home Health",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"I50.9 — Heart failure, unspecified", type:"text"},
       {id:"homebound", q:"Homebound status and skilled nursing need documented by physician?", type:"yn", drives:true,
         yes:"approve", no:"pend",
-        pendReason:"Per policy JHP-HH-006, skilled home health requires documented homebound status and a physician-certified skilled need. Pended — plan of care requested from Epic via EPP."},
+        pendReason:"Per policy JHP-HH-006, skilled home health requires documented homebound status and a physician-certified skilled need. Pended — plan of care requested via eHealth Exchange."},
       {id:"freq", q:"Requested visit frequency", prefill:"Skilled nursing 3×/week, 60 days", type:"text"}
     ],
     interqual:{set:"InterQual® 2026 — Home Care", criteria:[
@@ -634,9 +634,9 @@ const SCEN = {
       {c:"Physician-certified skilled need", key:true},
       {c:"Plan of care signed and time-limited"}]},
     approve:{auth:"MHK-HH-52071", note:"Skilled nursing 3×/week ×60 days · plan of care on file"},
-    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Regional Home Health (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Community Home Health (eCW)",
       docs:["Physician certification of homebound status (DocumentReference/hh-3361)","Signed plan of care (CMS-485)"],
-      authPrefix:"MHK", note:"Homebound certification + plan of care retrieved from Epic via EPP — home health approved on re-adjudication."}
+      authPrefix:"MHK", note:"Homebound certification + plan of care retrieved via eHealth Exchange — home health approved on re-adjudication."}
   },
   ozempic: {
     label:"Ozempic (semaglutide)", code:"Rx — semaglutide", paRequired:true, emr:"Epic", epp:true,
