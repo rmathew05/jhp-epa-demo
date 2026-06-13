@@ -858,7 +858,10 @@ function openDtr(){
   const s=state.s;
   setApi("dtr","active");
   addFlow("#api-crd","#api-dtr",C_API);
-  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR app retrieves Questionnaire + CQL prefill logic from JHP hub`);
+  // DTR Documentation Templates & Rules are authored by the delegated UM vendor
+  $("um-"+s.um).classList.add("routed");
+  addFlow("#api-dtr","#um-"+s.um,C_UM);
+  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR retrieves <b>${s.umName}</b> Questionnaire + CQL prefill rules (Documentation Templates &amp; Rules)`);
   $("dtrTitle").textContent=`DTR — ${s.label}`;
   let html="";
   s.questionnaire.forEach(q=>{
