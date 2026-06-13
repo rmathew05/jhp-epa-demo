@@ -874,43 +874,51 @@ async function submitDtr(){
 
   setApi("pas","done");
   if(outcome==="approve"){
-    trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>APPROVED</b> · Auth # ${s.approve.auth} · returned in seconds, not days`);
+    trace(`<span class="ok">[${s.umName}→Router]</span> ClaimResponse: <b>APPROVED</b> · Auth # ${s.approve.auth} · returned in seconds, not days`);
     updateQueue(paId, "Approved", "appr");
+    trace(s.epp
+      ? `<span class="ok">[Router→EPP→Epic]</span> Writing approved authorization back into <b>Epic</b> via EPP (final push)`
+      : `<span class="ok">[Router→eHX→${s.emr}]</span> Writing approved authorization back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
+    $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b><p style="margin:4px 0 0">Router writing the authorization back via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}.</p></div>`;
+    await flowDecision(s, C_OK);
     $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED</span>
       <h4 style="margin-top:8px">Prior authorization approved</h4>
       <div class="kv">Authorization #: <span>${s.approve.auth}</span></div>
       <div class="kv">${s.approve.note}</div>
       ${s.interqual?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
-      <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → decision, entirely inside the EHR workflow.</div></div>`;
-    trace(s.epp
-      ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
-      : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
-    await flowDecision(s, C_OK);
+      <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → Router → ${s.epp?"EPP":"eHX"} → EHR.</div></div>`;
+    renderFlows();
     memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
     bumpMetric("touchless");
   } else if(outcome==="pend"){
     const reason = driver?.pendReason || "Pended for clinical review.";
     const ref = s.pend?.ref || "RV-"+Math.floor(10000+Math.random()*90000);
-    trace(`<span class="warn">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>PENDED</b> · ${reason}`);
+    trace(`<span class="warn">[${s.umName}→Router]</span> ClaimResponse: <b>PENDED</b> · ${reason}`);
     updateQueue(paId, "Pended — clinical review", "pend");
+    trace(`<span class="warn">[Router→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Pend decision returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
+    $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b></div>`;
+    await flowDecision(s, C_WARN);
     $("ehrDecision").innerHTML=`<div class="decision pend"><span class="badge pend">PENDED</span>
       <h4 style="margin-top:8px">Pended for review</h4>
       <div class="kv">Reference #: <span>${ref}</span></div>
       <div class="kv">${reason}</div>
       ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    await flowDecision(s, C_WARN);
+    renderFlows();
     memberDecision("pend", s);
     bumpMetric("pend");
   } else {
-    trace(`<span class="err">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>DENIED</b> · reason code + policy citation returned (CMS-0057 specific-reason requirement)`);
+    trace(`<span class="err">[${s.umName}→Router]</span> ClaimResponse: <b>DENIED</b> · reason code + policy citation returned (CMS-0057 specific-reason requirement)`);
     updateQueue(paId, "Denied", "den");
+    trace(`<span class="err">[Router→${s.epp?"EPP→Epic":"eHX→"+s.emr}]</span> Denial + specific reason returned to <b>${s.emr}</b> via ${s.epp?"EPP":"eHealth Exchange proxy SMART-on-FHIR"}`);
+    $("ehrDecision").innerHTML=`<div class="card"><b>↩ Returning decision to ${s.emr}…</b></div>`;
+    await flowDecision(s, C_DEN);
     $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span>
       <h4 style="margin-top:8px">Prior authorization denied</h4>
       <div class="kv">${driver.denyReason}</div>
       <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    await flowDecision(s, C_DEN);
+    renderFlows();
     memberDecision("den", s);
     bumpMetric("den");
   }
@@ -969,6 +977,7 @@ async function cdexFlow(){
     <div class="kv">Documents attached: ${c.docs.length}</div>
     <div class="kv" style="margin-top:6px">${c.note}</div>
     <div class="kv" style="margin-top:8px;color:var(--muted)">The payer pulled the missing clinical documentation directly from the treating provider's system over the network — the burden-reduction story end to end.</div></div>`;
+  renderFlows();
   memberDecision("appr", s, `Resolved automatically — your plan retrieved the needed records. Authorization #${auth}.`);
   metricCdexResolve();
 }
