@@ -24,7 +24,7 @@
   .btn:disabled{background:#b7c4cf; cursor:not-allowed;}
   .btn.ghost{background:#fff; color:var(--jhp-accent); border:1px solid var(--jhp-accent);}
   .btn.ghost:hover{background:#eaf3fb;}
-  .layout{display:grid; grid-template-columns:1.1fr 1.1fr .85fr; gap:14px; padding:14px; max-width:1500px; margin:0 auto;}
+  .layout{display:grid; grid-template-columns:1.1fr 1.1fr .85fr; gap:14px; padding:14px; max-width:1500px; margin:0 auto; position:relative;}
   .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; min-height:540px;}
   .panel-head{padding:12px 16px; min-height:64px; display:flex; flex-direction:column; justify-content:center; gap:3px;}
   .panel-head .ttl{font-weight:700; font-size:13px; letter-spacing:.4px; text-transform:uppercase; display:flex; align-items:center; gap:7px;}
@@ -136,7 +136,11 @@
   .narrator .nf button{border-radius:6px; padding:7px 14px; font-size:12.5px; font-weight:600; border:none;}
   .narrator .skip{background:transparent; color:#8fb8dd; border:1px solid #2b3e54 !important;}
   .narrator .next{background:var(--jhp-accent); color:#fff;}
-  @media (max-width:1100px){.layout{grid-template-columns:1fr;} .metrics{grid-template-columns:repeat(2,1fr);}}
+  /* flow connector overlay */
+  #flowLayer{position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:6; overflow:visible;}
+  .flow-path{fill:none; stroke-width:2.5; stroke-linecap:round; stroke-dasharray:7 6; animation:dashflow .7s linear infinite; opacity:.9;}
+  @keyframes dashflow{to{stroke-dashoffset:-13;}}
+  @media (max-width:1100px){.layout{grid-template-columns:1fr;} .metrics{grid-template-columns:repeat(2,1fr);} #flowLayer{display:none;}}
 </style>
 </head>
 <body>
@@ -261,6 +265,8 @@
       <div id="memberLetter"></div>
     </div>
   </div>
+
+  <svg id="flowLayer"></svg>
 </div>
 
 <!-- FLOW TRACE -->
@@ -588,6 +594,46 @@ const SCEN = {
 let state = null;
 const $ = id => document.getElementById(id);
 
+/* ---------- FLOW CONNECTOR LINES ---------- */
+const SVGNS="http://www.w3.org/2000/svg";
+let flows=[]; // {fromSel,toSel,color}
+function addFlow(fromSel,toSel,color){ flows.push({fromSel,toSel,color}); renderFlows(); }
+function clearFlows(){ flows=[]; renderFlows(); }
+function clipToRect(cx,cy,hw,hh,dx,dy){
+  if(dx===0&&dy===0) return [cx,cy];
+  const sx = dx? hw/Math.abs(dx) : Infinity;
+  const sy = dy? hh/Math.abs(dy) : Infinity;
+  const s = Math.min(sx,sy);
+  return [cx+dx*s, cy+dy*s];
+}
+function renderFlows(){
+  const svg=$("flowLayer"); if(!svg) return;
+  const lay=document.querySelector(".layout"); const lr=lay.getBoundingClientRect();
+  svg.setAttribute("width",lay.scrollWidth); svg.setAttribute("height",lay.scrollHeight);
+  svg.setAttribute("viewBox",`0 0 ${lay.scrollWidth} ${lay.scrollHeight}`);
+  // defs (arrow marker, color set per-use via context-stroke)
+  let html=`<defs><marker id="fa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L6.5,3 L0,6 Z" fill="context-stroke"/></marker></defs>`;
+  flows.forEach((f,i)=>{
+    const a=document.querySelector(f.fromSel), b=document.querySelector(f.toSel);
+    if(!a||!b) return;
+    const ar=a.getBoundingClientRect(), br=b.getBoundingClientRect();
+    if(!ar.width||!br.width) return;
+    const ax=ar.left-lr.left+ar.width/2, ay=ar.top-lr.top+ar.height/2;
+    const bx=br.left-lr.left+br.width/2, by=br.top-lr.top+br.height/2;
+    const [sx,sy]=clipToRect(ax,ay,ar.width/2,ar.height/2, bx-ax, by-ay);
+    const [ex,ey]=clipToRect(bx,by,br.width/2,br.height/2, ax-bx, ay-by);
+    // gentle curve: control point offset perpendicular
+    const mx=(sx+ex)/2, my=(sy+ey)/2;
+    const dx=ex-sx, dy=ey-sy, len=Math.hypot(dx,dy)||1;
+    const off=Math.min(28, len*0.12);
+    const cxp=mx + (-dy/len)*off, cyp=my + (dx/len)*off;
+    html+=`<path class="flow-path" d="M${sx.toFixed(1)},${sy.toFixed(1)} Q${cxp.toFixed(1)},${cyp.toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}" stroke="${f.color}" marker-end="url(#fa)" style="animation-delay:${(i*0.06).toFixed(2)}s"/>`;
+  });
+  svg.innerHTML=html;
+}
+window.addEventListener("resize", renderFlows);
+const C_API="#1273c4", C_UM="#5b3fa8", C_OK="#1e7e45", C_WARN="#9a6700", C_DEN="#b3261e", C_CDEX="#c2410c", C_MEM="#0d6b6b";
+
 /* ---------- METRICS ---------- */
 const metrics = {total:0, touchless:0, cdex:0, savedHrs:0};
 function bumpMetric(kind){
@@ -651,9 +697,11 @@ async function signOrder(){
   memberStep(1);
   trace(`<span class="sys">[${s.emr}→CRD]</span> CDS Hooks <b>order-sign</b> fired in <b>${s.emr}</b> · ${s.label} (${s.code}) · Patient/JHP-88451203`);
   setApi("crd","active");
+  addFlow("#signBtn","#api-crd",C_API);
   await sleep(900);
   if(!s.paRequired){
     setApi("crd","done");
+    addFlow("#api-crd","#ms-3",C_MEM);
     memberStep(2); memberStep(3,"appr");
     trace(`<span class="sys">[CRD→EHR]</span> Card returned: <span class="ok">No prior authorization required</span> — order proceeds, zero provider burden`, "");
     $("crdCard").innerHTML=`<div class="card crd nopa"><span class="badge no">NO PA REQUIRED</span>
@@ -675,6 +723,7 @@ async function signOrder(){
 function openDtr(){
   const s=state.s;
   setApi("dtr","active");
+  addFlow("#api-crd","#api-dtr",C_API);
   trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR app retrieves Questionnaire + CQL prefill logic from JHP hub`);
   $("dtrTitle").textContent=`DTR — ${s.label}`;
   let html="";
@@ -713,8 +762,10 @@ async function submitDtr(){
 
   // PAS
   setApi("pas","active");
+  addFlow("#api-dtr","#api-pas",C_API);
   const paId="PA-"+Math.floor(100000+Math.random()*900000);
   state.paId=paId;
+  if(s.epp) addFlow("#api-pas","#net-epp",C_UM);
   if(s.epp){
     trace(`<span class="sys">[Epic→EPP→PAS]</span> PA submitted natively from <b>Epic</b> via <b>Epic Payer Platform (EPP)</b> · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
     $("net-epp").classList.add("routed");
@@ -729,6 +780,7 @@ async function submitDtr(){
     ? `<span class="sys">[EPP→UM]</span> Epic Payer Platform routes ${s.code} to <b>${s.umName}</b> (${s.umRole}) · payer adjudication`
     : `<span class="sys">[HUB]</span> Routing rules: ${s.code} → <b>${s.umName}</b> (${s.umRole}) · X12 278 translated at edge`);
   $("um-"+s.um).classList.add("routed");
+  addFlow(s.epp?"#net-epp":"#api-pas","#um-"+s.um,C_UM);
   updateQueue(paId, `Routed → ${s.umName}`, "");
   memberStep(2);
   await sleep(1100);
@@ -770,6 +822,7 @@ async function submitDtr(){
       <div class="kv">${s.approve.note}</div>
       ${s.interqual?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
       <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → decision, entirely inside the EHR workflow.</div></div>`;
+    addFlow("#um-"+s.um,"#ehrDecision",C_OK); addFlow("#api-pas","#ms-3",C_MEM);
     memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
     bumpMetric("touchless");
   } else if(outcome==="pend"){
@@ -783,6 +836,7 @@ async function submitDtr(){
       <div class="kv">${reason}</div>
       ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+    addFlow("#um-"+s.um,"#ehrDecision",C_WARN); addFlow("#api-pas","#ms-3",C_MEM);
     memberDecision("pend", s);
     bumpMetric("pend");
   } else {
@@ -793,6 +847,7 @@ async function submitDtr(){
       <div class="kv">${driver.denyReason}</div>
       <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+    addFlow("#um-"+s.um,"#ehrDecision",C_DEN); addFlow("#api-pas","#ms-3",C_MEM);
     memberDecision("den", s);
     bumpMetric("den");
   }
@@ -806,6 +861,7 @@ async function cdexFlow(){
 
   const isEpp = c.net==="epp";
   $("net-"+c.net).classList.add("routed");
+  addFlow("#um-"+s.um,"#net-"+c.net,C_CDEX);
   if(isEpp){
     trace(`<span class="sys">[EPP→Epic]</span> Data request via <b>Epic Payer Platform</b> · reasonReference: Claim/${paId}`);
     await sleep(900);
@@ -821,6 +877,7 @@ async function cdexFlow(){
   }
   await sleep(1000);
   c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
+  addFlow("#net-"+c.net,"#um-"+s.um,C_CDEX);
   await sleep(800);
   trace(`<span class="sys">[CDex→PAS]</span> $submit-attachment · Bundle{ DocumentReference ×${c.docs.length} } linked to Claim/${paId}`);
   updateQueue(paId, "Re-adjudicating", "req");
@@ -838,6 +895,7 @@ async function cdexFlow(){
   const auth=c.authPrefix+"-CDX-"+Math.floor(10000+Math.random()*90000);
   trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth} · documentation gap closed via network query — no fax, no portal, no phone call`);
   updateQueue(paId, "Approved via CDex", "appr");
+  addFlow("#um-"+s.um,"#ehrDecision",C_OK); addFlow("#api-pas","#ms-3",C_MEM);
   $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span>
     <h4 style="margin-top:8px">Prior authorization approved after CDex record retrieval</h4>
     <div class="kv">Authorization #: <span>${auth}</span></div>
@@ -867,6 +925,7 @@ function resetFlow(){
   ["net-ehx","net-hsx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
+  clearFlows();
   memberReset();
 }
 function resetDemo(){
