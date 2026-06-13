@@ -214,7 +214,7 @@
         <div><b>Maria Gonzalez</b><div class="kv">DOB <span>03/14/1968</span> · F · 58y</div></div>
         <div class="kv">Member ID<br><span>JHP-88451203</span></div>
         <div class="kv">Plan<br><span>JHP Medicaid HMO</span></div>
-        <div class="kv">PCP<br><span>Dr. R. Patel, Jefferson Internal Medicine</span></div>
+        <div class="kv"><span id="provLabel">PCP</span><br><span id="provVal">Dr. R. Patel, Jefferson Internal Medicine</span></div>
       </div>
 
       <h3 class="sec">New Order</h3>
@@ -701,11 +701,14 @@ const $ = id => document.getElementById(id);
 /* ---------- EMR SKIN: restyle the provider panel to mimic the real EHR ---------- */
 const EMR_THEME = {
   Epic:   {head:"#1a4f8b", head2:"#5cb85c", wordmark:"⬢ Epic", sub:"Hyperspace · SMART on FHIR", accent:"#1a4f8b", tint:"#eef4fb",
-           ribbon:"Snapshot · Chart Review · Orders · Results · Notes · In Basket"},
+           ribbon:"Snapshot · Chart Review · Orders · Results · Notes · In Basket",
+           provLabel:"PCP", prov:"Dr. R. Patel, Jefferson Internal Medicine"},
   eCW:    {head:"#173E58", head2:"#FF9900", wordmark:"eClinicalWorks", sub:"eCW · SMART on FHIR", accent:"#173E58", tint:"#eef3f7",
-           ribbon:"Hub · Progress Notes · Orders · Labs · Telephone · Documents"},
+           ribbon:"Hub · Progress Notes · Orders · Labs · Telephone · Documents",
+           provLabel:"Ordering Provider", prov:"Dr. M. Levin, Rothman Orthopaedics"},
   Oracle: {head:"#C74634", head2:"#3a3f44", wordmark:"ORACLE Health", sub:"PowerChart (Cerner) · SMART on FHIR", accent:"#C74634", tint:"#fbeeec",
-           ribbon:"PowerChart · Documentation · Orders · Results Review · Med List · Message Center"},
+           ribbon:"PowerChart · Documentation · Orders · Results Review · Med List · Message Center",
+           provLabel:"PCP", prov:"Dr. S. Romero, Atlantic Care Health System"},
 };
 function applyEmrSkin(emr){
   const t = EMR_THEME[emr];
@@ -713,8 +716,10 @@ function applyEmrSkin(emr){
   if(!t){ // neutral default
     head.style.background=""; $("ehrTtl").textContent="🏥 Provider EHR System Workflow";
     $("ehrSub").textContent="Epic / eCW / Oracle · SMART on FHIR flow";
-    panel.style.borderColor=""; panel.style.boxShadow=""; rb.className="ehr-ribbon"; return;
+    panel.style.borderColor=""; panel.style.boxShadow=""; rb.className="ehr-ribbon";
+    $("provLabel").textContent="PCP"; $("provVal").textContent="Dr. R. Patel, Jefferson Internal Medicine"; return;
   }
+  $("provLabel").textContent=t.provLabel; $("provVal").textContent=t.prov;
   head.style.background=`linear-gradient(100deg, ${t.head} 0%, ${t.head} 60%, ${t.head2} 100%)`;
   $("ehrTtl").textContent=t.wordmark;
   $("ehrSub").textContent=`${t.sub} · Provider EHR workflow`;
