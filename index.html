@@ -1147,23 +1147,85 @@ function autoAnswerDtr(key){
     if(target) pick(q.id, val, target);
   });
 }
+// Each step draws ONLY the hop it narrates, so lines stay in sync with the narration.
 const TOUR = [
-  {title:"Welcome", body:"This walks through Jefferson Health Plans' electronic prior auth using Da Vinci <b>CRD → DTR → PAS</b>, with <b>InterQual</b> criteria and <b>CDex</b> record retrieval. Three panels: provider EHR, payer hub, and the member's app.",
-   say:"Welcome. This demo walks through Jefferson Health Plans' electronic prior authorization, built on the Da Vinci standards: C R D, D T R, and P A S, with InterQual criteria and CDex record retrieval. You'll see three panels: the provider's E H R on the left, the payer hub in the center, and the member's app on the right.", action:()=>{ resetDemo(); }},
-  {title:"Pick a scenario", body:"We'll order an <b>MRI Lumbar Spine</b>. The order dropdown is in the provider EHR (left). Watch the payer hub (center) light up as the request flows.",
-   say:"Let's order an M R I of the lumbar spine. The order dropdown is in the provider E H R on the left. Watch the payer hub in the center light up as the request flows through.", action:()=>{ $("orderSel").value="mri"; }},
-  {title:"Sign the order — CRD fires", body:"Signing the order triggers a CDS Hook. <b>CRD</b> checks coverage in real time and tells the provider a prior auth is required — before they ever leave the chart.",
-   say:"Signing the order fires a C D S Hook. Coverage Requirements Discovery checks the plan's policy in real time and tells the provider a prior authorization is required, before they ever leave the chart.", action:async()=>{ await signOrder(); }},
-  {title:"DTR auto-fills the documentation", body:"Launching <b>DTR</b> opens a SMART on FHIR questionnaire. Most fields are <b>prefilled from the chart via CQL</b>. We'll answer the driving question to trigger a denial path first, then rescue it with CDex.",
-   say:"Launching D T R opens a SMART on FHIR questionnaire. Most fields are pre-filled straight from the chart using C Q L logic. We'll answer the key question to trigger a denial first, then rescue it with CDex.", action:()=>{ openDtr(); }},
-  {title:"Answer to force a gap", body:"We'll answer <b>No</b> to 'completed conservative therapy' — simulating documentation that lives at another provider. Then submit to PAS.",
-   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ autoAnswerDtr('mri'); await sleep(500); await submitDtr(); }},
-  {title:"Denied — with a specific reason", body:"PAS routed to <b>eviCore</b> and returned a <b>denial with the exact policy citation</b> (CMS-0057 requires specific reasons). The member app (right) shows the status and appeal rights. Now click the CDex button.",
-   say:"P A S routed the request to eviCore, which returned a denial with the exact policy citation. C M S rule fifty-seven requires a specific reason. The member app on the right shows the status and appeal rights. Now let's use CDex.", action:async()=>{ if($("cdexBtn")){ await cdexFlow(); } }},
-  {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>eHealth Exchange</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
-   say:"The hub issued a CDex task, found the patient over the eHealth Exchange network, pulled the physical therapy records from Rothman's E H R, attached them, and re-adjudicated to approved. No fax, no phone call. Watch the metrics bar update at the top.", action:()=>{}},
-  {title:"That's the story", body:"Order → CRD → DTR → <b>Router</b> → eviCore → PAS → eHealth Exchange → decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios — each routes to a different delegated vendor (MHK runs InterQual, pharmacy runs ESI / CMS-0062, and so on).",
-   say:"That's the full story: order, to C R D, to D T R, to the J H P ePA Router, to eviCore, to P A S, written back into the E H R, all surfaced to the member in real time. Try the other scenarios. Each one routes to a different delegated vendor.", action:()=>{ endGuided(); }}
+  {title:"Welcome",
+   body:"This walks through JHP's electronic prior auth on Da Vinci <b>CRD → DTR → PAS</b>, routed by the <b>JHP ePA Router</b>, with <b>CDex</b> as the safety net. Each <b>Next</b> draws the next hop.",
+   say:"Welcome. This demo walks through electronic prior authorization on the Da Vinci standards, routed by the J H P ePA Router, with CDex as the safety net. Each Next click draws the next hop in the flow.",
+   action:()=>{ resetDemo(); $("orderSel").value="mri"; skinForCurrentOrder(); }},
+
+  {title:"Order signed — CRD fires",
+   body:"The provider signs an <b>MRI Lumbar Spine</b> order in eClinicalWorks. A CDS Hook fires <b>CRD</b>, which checks coverage and returns: <b>prior auth required</b>.",
+   say:"The provider signs an M R I order in eClinicalWorks. A C D S Hook fires Coverage Requirements Discovery, which checks coverage and returns: prior authorization required.",
+   action:async()=>{ const M=SCEN.mri; resetFlow(); memberStep(1);
+     $("emrTag").innerHTML=`Source EHR System: <b style="color:var(--ink)">${M.emr}</b> · ePA via PAS · CDex over eHX`;
+     setApi("crd","active"); addFlow("#signBtn","#api-crd",C_API);
+     trace(`<span class="sys">[${M.emr}→CRD]</span> order-sign · ${M.label} (${M.code})`);
+     await sleep(550); setApi("crd","done");
+     $("crdCard").innerHTML=`<div class="card crd"><span class="badge req">PA REQUIRED</span><h4 style="margin-top:8px">${M.label} requires prior authorization</h4></div>`; }},
+
+  {title:"DTR — documentation",
+   body:"<b>DTR</b> opens a SMART-on-FHIR questionnaire, prefilled from the chart via CQL. It's completed and packaged with the request.",
+   say:"D T R opens a SMART on FHIR questionnaire, prefilled from the chart. It's completed and packaged with the request.",
+   action:async()=>{ setApi("dtr","active"); addFlow("#api-crd","#api-dtr",C_API);
+     trace(`<span class="sys">[EHR→DTR]</span> DTR Questionnaire prefilled via CQL · QuestionnaireResponse complete`);
+     await sleep(550); setApi("dtr","done");
+     $("dtrStatus").innerHTML=`<div class="card"><b>📋 DTR complete</b><p style="margin:4px 0 0">Documentation packaged with the PA request.</p></div>`; }},
+
+  {title:"JHP ePA Router orchestrates",
+   body:"After DTR, the request goes to the <b>JHP ePA Router</b> (SMART on FHIR) — the orchestrator that coordinates every delegated UM vendor.",
+   say:"After D T R, the request goes to the J H P ePA Router, the SMART on FHIR orchestrator that coordinates every delegated U M vendor.",
+   action:async()=>{ $("um-router").classList.add("routed"); addFlow("#api-dtr","#um-router",C_UM);
+     trace(`<span class="sys">[DTR→Router]</span> JHP ePA Router orchestrates the request`); }},
+
+  {title:"Routed to eviCore",
+   body:"The Router sends this radiology request to <b>eviCore</b> for adjudication.",
+   say:"The Router sends this radiology request to eviCore for adjudication.",
+   action:async()=>{ const M=SCEN.mri; $("um-evicore").classList.add("routed"); addFlow("#um-router","#um-evicore",C_UM);
+     trace(`<span class="sys">[Router→eviCore]</span> routes ${M.code} to eviCore (Radiology) for adjudication`); }},
+
+  {title:"eviCore denies — via PAS",
+   body:"eviCore finds no documented conservative-therapy trial, so it <b>denies</b>. <b>PAS</b> returns the specific reason electronically (CMS-0057).",
+   say:"eviCore finds no documented conservative therapy trial, so it denies. P A S returns the specific reason electronically, as C M S rule fifty-seven requires.",
+   action:async()=>{ const M=SCEN.mri, paId="PA-"+Math.floor(100000+Math.random()*900000); state={s:M,answers:{},paId};
+     setApi("pas","active"); addFlow("#um-evicore","#api-pas",C_API); addQueue(paId,M,"Adjudicated → eviCore");
+     trace(`<span class="sys">[eviCore→PAS]</span> adjudication complete · PAS prepares ClaimResponse · id ${paId}`);
+     memberStep(2); await sleep(550); setApi("pas","done"); updateQueue(paId,"Denied","den");
+     trace(`<span class="err">[PAS]</span> ClaimResponse: <b>DENIED</b> · ${M.questionnaire.find(q=>q.drives).denyReason}`); }},
+
+  {title:"Denial written back via eHX",
+   body:"The provider is on eClinicalWorks (non-Epic), so <b>PAS</b> writes the denial back into the EHR through the <b>eHealth Exchange</b> proxy. The member sees status and appeal rights.",
+   say:"The provider is on eClinicalWorks, so P A S writes the denial back into the E H R through the eHealth Exchange proxy. The member sees the status and appeal rights.",
+   action:async()=>{ const M=SCEN.mri; $("net-ehx").classList.add("routed");
+     addFlow("#api-pas","#net-ehx",C_DEN); await sleep(450); addFlow("#net-ehx","#ehrDecision",C_DEN);
+     trace(`<span class="err">[PAS→eHX→${M.emr}]</span> denial + specific reason returned to ${M.emr} via eHealth Exchange proxy`);
+     $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span><h4 style="margin-top:8px">Prior authorization denied</h4><div class="kv">${M.questionnaire.find(q=>q.drives).denyReason}</div><div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F.</div></div>`;
+     addFlow("#api-pas","#ms-3",C_MEM); memberDecision("den",M); bumpMetric("den"); renderFlows(); }},
+
+  {title:"CDex retrieves the missing records",
+   body:"The hub fires a <b>CDex Task</b>, finds the patient over <b>eHealth Exchange</b>, and pulls the PT records from <b>Rothman (eCW)</b> — no fax, no phone call.",
+   say:"The hub fires a CDex task, finds the patient over eHealth Exchange, and pulls the physical therapy records from Rothman's eClinicalWorks system. No fax, no phone call.",
+   action:async()=>{ const c=SCEN.mri.cdex; addFlow("#um-evicore","#net-ehx",C_CDEX);
+     trace(`<span class="sys">[HUB→CDex]</span> Task data-request-query → eHealth Exchange · match @ ${c.source}`);
+     await sleep(550); c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
+     addFlow("#net-ehx","#um-evicore",C_CDEX);
+     trace(`<span class="sys">[CDex→PAS]</span> $submit-attachment · DocumentReference ×${c.docs.length} linked to the claim`); }},
+
+  {title:"Re-adjudicated — APPROVED",
+   body:"With the records attached, eviCore re-adjudicates to <b>approved</b>. PAS writes the authorization back into the EHR via eHX, and the member is notified.",
+   say:"With the records attached, eviCore re-adjudicates to approved. P A S writes the authorization back into the E H R via eHealth Exchange, and the member is notified.",
+   action:async()=>{ const M=SCEN.mri, paId=(state&&state.paId)||"PA-000000", auth="EVC-CDX-"+Math.floor(10000+Math.random()*90000);
+     setApi("pas","active"); await sleep(450); setApi("pas","done");
+     trace(`<span class="ok">[eviCore→PAS]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth}`);
+     updateQueue(paId,"Approved via CDex","appr");
+     addFlow("#api-pas","#net-ehx",C_OK); await sleep(450); addFlow("#net-ehx","#ehrDecision",C_OK);
+     $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span><h4 style="margin-top:8px">Prior authorization approved</h4><div class="kv">Authorization #: <span>${auth}</span></div><div class="kv">${M.cdex.note}</div></div>`;
+     addFlow("#api-pas","#ms-3",C_MEM); memberDecision("appr",M,`Authorization #${auth}.`); metricCdexResolve(); renderFlows(); }},
+
+  {title:"That's the story",
+   body:"Order → CRD → DTR → <b>Router</b> → eviCore → PAS → eHealth Exchange → EHR, with CDex as the safety net. Try the others — Epic writes back via EPP, MHK runs InterQual, pharmacy runs ESI / CMS-0062.",
+   say:"That's the full story: order, to C R D, to D T R, to the Router, to eviCore, to P A S, written back through eHealth Exchange, with CDex as the safety net. Try the other scenarios.",
+   action:()=>{ endGuided(); }}
 ];
 let tourIdx=-1, tourBusy=false;
 let voiceOn = ('speechSynthesis' in window);
