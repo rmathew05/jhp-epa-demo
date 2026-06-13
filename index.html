@@ -222,11 +222,9 @@
         <select id="orderSel">
           <optgroup label="──  Epic  (ePA + write-back via EPP)  ──">
           <option value="pt">🏥 Physical Therapy ×12 visits — CPT 97110</option>
-          <option value="rx">💊 Skyrizi (risankizumab) — J2327 · pharmacy</option>
           <option value="ozempic">💊 Ozempic (semaglutide) — Rx · pharmacy</option>
           <option value="pet">🩻 PET/CT Staging, oncologic — CPT 78815</option>
           <option value="immuno">🩻 Keytruda (pembrolizumab) — J9271</option>
-          <option value="imrt">🩻 IMRT Radiation Therapy — CPT 77385</option>
           <option value="genomic">🩻 Comprehensive Genomic Profiling — CPT 81455</option>
           <option value="cmr">🩻 Cardiac MRI — CPT 75561</option>
           </optgroup>
@@ -241,6 +239,7 @@
           <optgroup label="──  Oracle  (write-back via eHealth Exchange)  ──">
           <option value="bh">🧠 Behavioral Health IOP — H0015</option>
           <option value="cpap">🏥 CPAP Device (DME) — E0601</option>
+          <option value="imrt">🩻 IMRT Radiation Therapy — CPT 77385</option>
           <option value="dupixent">💊 Dupixent (dupilumab) — Rx · pharmacy</option>
           <option value="vision">👁️ Scleral Contact Lenses, keratoconus — V2531</option>
           <option value="pdn">🏠 Private Duty Nursing — HCPCS T1000</option>
@@ -459,21 +458,6 @@ const SCEN = {
       docs:["Polysomnography report — AHI 28.4 (DocumentReference/sleep-5521)"],
       authPrefix:"MHK", note:"Qualifying sleep study retrieved — denial overturned, CPAP approved."}
   },
-  rx: {
-    label:"Skyrizi (risankizumab)", code:"J2327", paRequired:true, emr:"Epic", epp:true,
-    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
-    questionnaire:[
-      {id:"dx", q:"Primary diagnosis", prefill:"L40.50 — Arthropathic psoriasis", type:"text"},
-      {id:"step", q:"Tried and failed conventional DMARD (e.g., methotrexate ≥ 3 months)?", type:"yn", drives:true,
-        yes:"approve", no:"deny",
-        denyReason:"Step therapy not met. Per formulary policy JHP-RX-114, a conventional DMARD trial (methotrexate or equivalent, ≥ 3 months) is required before IL-23 inhibitors."},
-      {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 04/22/2026", type:"text"}
-    ],
-    approve:{auth:"ESI-SP-31178", note:"12-month authorization · dispensed via Accredo specialty pharmacy"},
-    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Jefferson Rheumatology (Epic)",
-      docs:["Medication history — methotrexate 20mg, 16 weeks, inadequate response (DocumentReference/med-7740)","Rheumatology progress note"],
-      authPrefix:"ESI", note:"Step therapy requirement satisfied by retrieved medication history — approved."}
-  },
   vision: {
     label:"Scleral Contact Lenses, keratoconus", code:"V2531", paRequired:true, emr:"Oracle",
     um:"davis", umName:"Davis", umRole:"Vision",
@@ -529,7 +513,7 @@ const SCEN = {
       authPrefix:"EVC", note:"PD-L1 high, no targetable driver — NCCN criteria met, denial overturned and pembrolizumab approved."}
   },
   imrt: {
-    label:"IMRT Radiation Therapy", code:"CPT 77385", paRequired:true, emr:"Epic", epp:true,
+    label:"IMRT Radiation Therapy", code:"CPT 77385", paRequired:true, emr:"Oracle",
     um:"evicore", umName:"eviCore", umRole:"Radiation Oncology",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, right upper lobe", type:"text"},
@@ -543,7 +527,7 @@ const SCEN = {
       {c:"Dose/fractionation within guideline range"},
       {c:"Curative or definitive intent established"}]},
     approve:{auth:"EVC-RO-330145", note:"Full course authorized · 30 fractions · Bodine Center for Radiation Oncology"},
-    cdex:{net:"epp", netName:"Epic Payer Platform", source:"SKCC Radiation Oncology (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"SKCC Radiation Oncology (Oracle)",
       docs:["IMRT treatment plan + DVH, cord max 42 Gy (DocumentReference/ro-9912)","CT simulation report"],
       authPrefix:"EVC", note:"Plan confirms OAR sparing requirement — IMRT approved on re-adjudication."}
   },
