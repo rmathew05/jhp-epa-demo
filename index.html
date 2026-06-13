@@ -24,6 +24,8 @@
   .btn:disabled{background:#b7c4cf; cursor:not-allowed;}
   .btn.ghost{background:#fff; color:var(--jhp-accent); border:1px solid var(--jhp-accent);}
   .btn.ghost:hover{background:#eaf3fb;}
+  .btn.ghost.on{background:#fde8c2; color:#9a6700; border-color:#9a6700;}
+  #nextStepBtn{background:#1e7e45;} #nextStepBtn:hover{background:#176235;}
   .layout{display:grid; grid-template-columns:1.1fr 1.1fr .85fr; gap:14px; padding:14px; max-width:1500px; margin:0 auto; position:relative;}
   .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; min-height:540px;}
   .panel-head{padding:12px 16px; min-height:64px; display:flex; flex-direction:column; justify-content:center; gap:3px;}
@@ -178,7 +180,9 @@
   <div class="logo">JHP <span>| Interoperability Hub — ePA Prototype</span></div>
   <div class="tag">Da Vinci CRD · DTR · PAS · CDex</div>
   <div class="tag">CMS-0057-F</div>
-  <button class="btn reset" style="margin-left:auto" onclick="startGuided()">▶ Guided demo</button>
+  <button class="btn ghost" id="stepToggle" style="margin-left:auto" onclick="toggleStep()">⏭ Step mode: Off</button>
+  <button class="btn" id="nextStepBtn" style="display:none" onclick="doNext()">Next ▶</button>
+  <button class="btn reset" onclick="startGuided()">▶ Guided demo</button>
   <button class="btn ghost" onclick="resetDemo()">↺ Reset</button>
 </header>
 
@@ -631,10 +635,11 @@ function clearFlows(){ flows=[]; renderFlows(); }
 // decision returns: vendor -> Router -> write-back into EMR -> EHR + member
 //   Epic provider     -> via EPP
 //   eCW/Oracle provider -> via eHealth Exchange proxy SMART-on-FHIR
-function flowDecision(s,color){
-  addFlow("#um-"+s.um,"#um-router",color);
-  if(s.epp){ $("net-epp").classList.add("routed"); addFlow("#um-router","#net-epp",color); addFlow("#net-epp","#ehrDecision",color); }
-  else { $("net-ehx").classList.add("routed"); addFlow("#um-router","#net-ehx",color); addFlow("#net-ehx","#ehrDecision",color); }
+async function flowDecision(s,color){
+  addFlow("#um-"+s.um,"#um-router",color); await gate(500);
+  if(s.epp){ $("net-epp").classList.add("routed"); addFlow("#um-router","#net-epp",color); await gate(500); addFlow("#net-epp","#ehrDecision",color); }
+  else { $("net-ehx").classList.add("routed"); addFlow("#um-router","#net-ehx",color); await gate(500); addFlow("#net-ehx","#ehrDecision",color); }
+  await gate(450);
   addFlow("#api-pas","#ms-3",C_MEM);
 }
 function clipToRect(cx,cy,hw,hh,dx,dy){
@@ -724,6 +729,22 @@ function trace(msg, cls=""){
   el.parentElement.scrollTop = el.parentElement.scrollHeight;
 }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+/* ---------- STEP MODE: gate each stage on a Next click ---------- */
+let stepMode=false, gateResolve=null;
+function gate(ms){
+  if(stepMode){ return new Promise(res=>{ gateResolve=res; showNext(true); }); }
+  return sleep(ms);
+}
+function doNext(){ if(gateResolve){ const r=gateResolve; gateResolve=null; showNext(false); r(); } }
+function showNext(on){ const b=$("nextStepBtn"); if(b) b.style.display = on ? "inline-block" : "none"; }
+function clearGate(){ gateResolve=null; showNext(false); }
+function toggleStep(){
+  stepMode=!stepMode;
+  const b=$("stepToggle");
+  b.textContent = stepMode ? "⏭ Step mode: On" : "⏭ Step mode: Off";
+  b.classList.toggle("on", stepMode);
+  if(!stepMode) doNext(); // release any pending pause when turning off
+}
 function setApi(id, mode){ const e=$("api-"+id); e.classList.remove("active","done","pulse"); if(mode) e.classList.add(mode); if(mode==="active") e.classList.add("pulse"); }
 
 async function signOrder(){
@@ -736,7 +757,7 @@ async function signOrder(){
   trace(`<span class="sys">[${s.emr}→CRD]</span> CDS Hooks <b>order-sign</b> fired in <b>${s.emr}</b> · ${s.label} (${s.code}) · Patient/JHP-88451203`);
   setApi("crd","active");
   addFlow("#signBtn","#api-crd",C_API);
-  await sleep(900);
+  await gate(900);
   if(!s.paRequired){
     setApi("crd","done");
     addFlow("#api-crd","#ms-3",C_MEM);
@@ -796,7 +817,7 @@ async function submitDtr(){
   setApi("dtr","done");
   trace(`<span class="sys">[DTR]</span> QuestionnaireResponse complete · ${s.questionnaire.length} items (${s.questionnaire.filter(q=>q.prefill).length} auto-prefilled via CQL)`);
   $("dtrStatus").innerHTML=`<div class="card"><b>📋 DTR complete</b><p style="margin:4px 0 0">Documentation packaged with the PA request.</p></div>`;
-  await sleep(500);
+  await gate(500);
 
   // PAS
   setApi("pas","active");
@@ -811,17 +832,18 @@ async function submitDtr(){
     trace(`<span class="sys">[EHR→PAS]</span> Claim/$submit · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
   }
   addQueue(paId, s, "Received");
-  await sleep(900);
+  await gate(900);
 
   // routing via JHP ePA Router (SMART on FHIR orchestrator)
   trace(`<span class="sys">[PAS→Router]</span> <b>JHP ePA Router</b> (SMART on FHIR) orchestrates · routes ${s.code} to <b>${s.umName}</b> (${s.umRole})`);
   $("um-router").classList.add("routed");
   addFlow("#api-pas","#um-router",C_UM);
+  await gate(700);
   $("um-"+s.um).classList.add("routed");
   addFlow("#um-router","#um-"+s.um,C_UM);
   updateQueue(paId, `Routed → ${s.umName}`, "");
   memberStep(2);
-  await sleep(1100);
+  await gate(1100);
 
   // outcome
   let outcome="approve";
@@ -836,18 +858,18 @@ async function submitDtr(){
   if(s.interqual){
     const eng = s.interqual.engine || "InterQual";
     trace(`<span class="sys">[${s.umName}]</span> Auto-review against <b>${s.interqual.set}</b>`);
-    await sleep(700);
+    await gate(700);
     s.interqual.criteria.forEach(cr=>{
       const fail = outcome!=="approve" && cr.key;
       trace(fail
         ? `<span class="err">[${eng}]</span> ✗ ${cr.c} — <b>not documented</b>`
         : `<span class="ok">[${eng}]</span> ✓ ${cr.c} — met`);
     });
-    await sleep(700);
+    await gate(700);
     trace(outcome==="approve"
       ? `<span class="ok">[${eng}]</span> All criteria MET → auto-approval, no manual review`
       : `<span class="warn">[${eng}]</span> Criteria NOT met → cannot auto-approve`);
-    await sleep(500);
+    await gate(500);
   }
 
   setApi("pas","done");
@@ -863,7 +885,7 @@ async function submitDtr(){
     trace(s.epp
       ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
       : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
-    flowDecision(s, C_OK);
+    await flowDecision(s, C_OK);
     memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
     bumpMetric("touchless");
   } else if(outcome==="pend"){
@@ -877,7 +899,7 @@ async function submitDtr(){
       <div class="kv">${reason}</div>
       ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    flowDecision(s, C_WARN);
+    await flowDecision(s, C_WARN);
     memberDecision("pend", s);
     bumpMetric("pend");
   } else {
@@ -888,7 +910,7 @@ async function submitDtr(){
       <div class="kv">${driver.denyReason}</div>
       <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    flowDecision(s, C_DEN);
+    await flowDecision(s, C_DEN);
     memberDecision("den", s);
     bumpMetric("den");
   }
@@ -905,31 +927,31 @@ async function cdexFlow(){
   addFlow("#um-"+s.um,"#net-"+c.net,C_CDEX);
   if(isEpp){
     trace(`<span class="sys">[EPP→Epic]</span> Data request via <b>Epic Payer Platform</b> · reasonReference: Claim/${paId}`);
-    await sleep(900);
+    await gate(900);
     trace(`<span class="sys">[EPP↔Epic]</span> Payer Platform links payer ↔ <b>${c.source}</b> · records shared natively (no query/retrieve handoff)`);
-    await sleep(1000);
+    await gate(1000);
     trace(`<span class="sys">[Epic→EPP]</span> Clinical documents released through Epic Payer Platform`);
   } else {
     trace(`<span class="sys">[HUB→CDex]</span> Task created · code=<b>data-request-query</b> · reasonReference: Claim/${paId} · requester: JHP UM`);
-    await sleep(900);
+    await gate(900);
     trace(`<span class="sys">[CDex→${c.netName}]</span> Patient discovery (IHE XCPD) · Gonzalez, Maria · DOB 03/14/1968 · match found @ <b>${c.source}</b>`);
-    await sleep(1000);
+    await gate(1000);
     trace(`<span class="sys">[${c.netName}→${c.source}]</span> Document query (XCA / FHIR DocumentReference search)`);
   }
-  await sleep(1000);
+  await gate(1000);
   c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
   addFlow("#net-"+c.net,"#um-"+s.um,C_CDEX);
-  await sleep(800);
+  await gate(800);
   trace(`<span class="sys">[CDex→PAS]</span> $submit-attachment · Bundle{ DocumentReference ×${c.docs.length} } linked to Claim/${paId}`);
   updateQueue(paId, "Re-adjudicating", "req");
   setApi("pas","active");
-  await sleep(1100);
+  await gate(1100);
   if(s.interqual){
     const eng = s.interqual.engine || "InterQual";
     trace(`<span class="sys">[${s.umName}]</span> ${eng} re-review with retrieved documentation · ${s.interqual.set}`);
-    await sleep(700);
+    await gate(700);
     trace(`<span class="ok">[${eng}]</span> All criteria now MET → auto-approval`);
-    await sleep(500);
+    await gate(500);
   }
   setApi("pas","done");
 
@@ -939,7 +961,7 @@ async function cdexFlow(){
   trace(s.epp
     ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
     : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
-  flowDecision(s, C_OK);
+  await flowDecision(s, C_OK);
   $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span>
     <h4 style="margin-top:8px">Prior authorization approved after CDex record retrieval</h4>
     <div class="kv">Authorization #: <span>${auth}</span></div>
@@ -970,6 +992,7 @@ function resetFlow(){
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
   clearFlows();
+  clearGate();
   memberReset();
 }
 function resetDemo(){
@@ -992,7 +1015,7 @@ const TOUR = [
   {title:"DTR auto-fills the documentation", body:"Launching <b>DTR</b> opens a SMART on FHIR questionnaire. Most fields are <b>prefilled from the chart via CQL</b>. We'll answer the driving question to trigger a denial path first, then rescue it with CDex.",
    say:"Launching D T R opens a SMART on FHIR questionnaire. Most fields are pre-filled straight from the chart using C Q L logic. We'll answer the key question to trigger a denial first, then rescue it with CDex.", action:()=>{ openDtr(); }},
   {title:"Answer to force a gap", body:"We'll answer <b>No</b> to 'completed conservative therapy' — simulating documentation that lives at another provider. Then submit to PAS.",
-   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ pick('cons','No', document.querySelector('[data-q=cons] button:nth-child(2)')); await sleep(400); await submitDtr(); }},
+   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ pick('cons','No', document.querySelector('[data-q=cons] button:nth-child(2)')); await gate(400); await submitDtr(); }},
   {title:"Denied — with a specific reason", body:"PAS routed to <b>eviCore</b> and returned a <b>denial with the exact policy citation</b> (CMS-0057 requires specific reasons). The member app (right) shows the status and appeal rights. Now click the CDex button.",
    say:"P A S routed the request to eviCore, which returned a denial with the exact policy citation. C M S rule fifty-seven requires a specific reason. The member app on the right shows the status and appeal rights. Now let's use CDex.", action:async()=>{ if($("cdexBtn")){ await cdexFlow(); } }},
   {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>eHealth Exchange</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
@@ -1024,7 +1047,7 @@ function toggleVoice(){
   if(voiceOn){ b.innerHTML="🔊 Voice"; b.style.color="#8fb8dd"; if(tourIdx>=0&&TOUR[tourIdx]) speak(TOUR[tourIdx].say); }
   else { b.innerHTML="🔇 Muted"; b.style.color="#6b7c8e"; if(synth) synth.cancel(); }
 }
-function startGuided(){ tourIdx=-1; $("narrator").classList.add("show"); if(synth) synth.getVoices(); narAdvance(); }
+function startGuided(){ if(stepMode) toggleStep(); tourIdx=-1; $("narrator").classList.add("show"); if(synth) synth.getVoices(); narAdvance(); }
 function endGuided(){ $("narrator").classList.remove("show"); tourIdx=-1; if(synth) synth.cancel(); }
 async function narAdvance(){
   if(tourBusy) return;
