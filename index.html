@@ -70,6 +70,9 @@
   .um b{display:block; font-size:13px;}
   .um .role{color:var(--muted); font-size:11px;}
   .um.routed{border-color:var(--purple); background:#f1edfb; box-shadow:0 0 0 3px rgba(91,63,168,.12);}
+  .orchestrator{border:1.5px solid var(--jhp-accent); background:#eaf3fb; margin-bottom:8px;}
+  .orchestrator b{color:var(--jhp-blue);}
+  .orchestrator .role{color:var(--jhp-accent);}
   .queue-item{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; display:flex; align-items:center; gap:10px; font-size:13px;}
   .queue-item .grow{flex:1;}
   .queue-item .id{font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--muted);}
@@ -222,6 +225,7 @@
       </div>
 
       <h3 class="sec">UM Routing</h3>
+      <div class="um orchestrator" id="um-router"><b>JHP ePA Router</b><span class="role">SMART on FHIR orchestrator · coordinates all delegated UM vendors · writes the decision back into Epic via EPP</span></div>
       <div class="um-grid">
         <div class="um" id="um-evicore"><b>eviCore</b><span class="role">Radiology / MSK</span></div>
         <div class="um" id="um-optum"><b>Optum BH</b><span class="role">Behavioral Health</span></div>
@@ -233,9 +237,8 @@
       </div>
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex or IHE</h3>
-      <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls clinical data directly from provider EHRs</span></div>
-        <div class="um" id="net-hsx"><b>HSX</b><span class="role">HealthShare Exchange · Regional HIE</span></div>
+      <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls data from provider EHRs · proxy SMART-on-FHIR write-back to non-Epic EMRs</span></div>
         <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
       </div>
 
@@ -321,7 +324,7 @@ const SCEN = {
       {id:"neuro", q:"Progressive neurologic deficit present?", type:"yn"}
     ],
     approve:{auth:"EVC-2026-118394", note:"Valid 60 days · Jefferson Methodist Imaging Center"},
-    cdex:{net:"hsx", netName:"HSX", source:"Rothman Orthopaedics (eCW)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Rothman Orthopaedics (eCW)",
       docs:["PT progress notes — 8 weeks conservative therapy (DocumentReference/pt-4471)","Medication history — NSAID course, 10 weeks"],
       authPrefix:"EVC", note:"Conservative therapy documented at Rothman — denial overturned on re-adjudication."}
   },
@@ -368,7 +371,7 @@ const SCEN = {
       {id:"bmi", q:"BMI", prefill:"31.2 (from vitals)", type:"text"}
     ],
     approve:{auth:"EVC-MSK-204417", note:"Valid 90 days · Rothman Orthopaedics at Jefferson · includes 3-day inpatient stay"},
-    cdex:{net:"hsx", netName:"HSX", source:"Rothman Orthopaedics (eCW)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Rothman Orthopaedics (eCW)",
       docs:["PT course — 14 weeks (DocumentReference/pt-8812)","Corticosteroid injection records ×2","Orthopedic consult notes"],
       authPrefix:"EVC", note:"Conservative management documented at Rothman — approved on re-adjudication."}
   },
@@ -437,7 +440,7 @@ const SCEN = {
     ],
     approve:{auth:"DVS-MN-44892", note:"Medically necessary lenses · 1 pair per year · in-network provider"},
     pend:{ref:"DVS-P-44893", note:"Pended — awaiting corneal topography"},
-    cdex:{net:"hsx", netName:"HSX", source:"Wills Eye Hospital (Oracle)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Wills Eye Hospital (Oracle)",
       docs:["Pentacam corneal tomography — Kmax 58.1D (DocumentReference/eye-1184)"],
       authPrefix:"DVS", note:"Topography retrieved from Wills Eye — medically necessary lenses approved."}
   },
@@ -599,6 +602,15 @@ const SVGNS="http://www.w3.org/2000/svg";
 let flows=[]; // {fromSel,toSel,color}
 function addFlow(fromSel,toSel,color){ flows.push({fromSel,toSel,color}); renderFlows(); }
 function clearFlows(){ flows=[]; renderFlows(); }
+// decision returns: vendor -> Router -> write-back into EMR -> EHR + member
+//   Epic provider     -> via EPP
+//   eCW/Oracle provider -> via eHealth Exchange proxy SMART-on-FHIR
+function flowDecision(s,color){
+  addFlow("#um-"+s.um,"#um-router",color);
+  if(s.epp){ $("net-epp").classList.add("routed"); addFlow("#um-router","#net-epp",color); addFlow("#net-epp","#ehrDecision",color); }
+  else { $("net-ehx").classList.add("routed"); addFlow("#um-router","#net-ehx",color); addFlow("#net-ehx","#ehrDecision",color); }
+  addFlow("#api-pas","#ms-3",C_MEM);
+}
 function clipToRect(cx,cy,hw,hh,dx,dy){
   if(dx===0&&dy===0) return [cx,cy];
   const sx = dx? hw/Math.abs(dx) : Infinity;
@@ -775,12 +787,12 @@ async function submitDtr(){
   addQueue(paId, s, "Received");
   await sleep(900);
 
-  // routing
-  trace(s.epp
-    ? `<span class="sys">[EPP→UM]</span> Epic Payer Platform routes ${s.code} to <b>${s.umName}</b> (${s.umRole}) · payer adjudication`
-    : `<span class="sys">[HUB]</span> Routing rules: ${s.code} → <b>${s.umName}</b> (${s.umRole}) · X12 278 translated at edge`);
+  // routing via JHP ePA Router (SMART on FHIR orchestrator)
+  trace(`<span class="sys">[PAS→Router]</span> <b>JHP ePA Router</b> (SMART on FHIR) orchestrates · routes ${s.code} to <b>${s.umName}</b> (${s.umRole})`);
+  $("um-router").classList.add("routed");
+  addFlow("#api-pas","#um-router",C_UM);
   $("um-"+s.um).classList.add("routed");
-  addFlow(s.epp?"#net-epp":"#api-pas","#um-"+s.um,C_UM);
+  addFlow("#um-router","#um-"+s.um,C_UM);
   updateQueue(paId, `Routed → ${s.umName}`, "");
   memberStep(2);
   await sleep(1100);
@@ -822,7 +834,10 @@ async function submitDtr(){
       <div class="kv">${s.approve.note}</div>
       ${s.interqual?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
       <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → decision, entirely inside the EHR workflow.</div></div>`;
-    addFlow("#um-"+s.um,"#ehrDecision",C_OK); addFlow("#api-pas","#ms-3",C_MEM);
+    trace(s.epp
+      ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
+      : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
+    flowDecision(s, C_OK);
     memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
     bumpMetric("touchless");
   } else if(outcome==="pend"){
@@ -836,7 +851,7 @@ async function submitDtr(){
       <div class="kv">${reason}</div>
       ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    addFlow("#um-"+s.um,"#ehrDecision",C_WARN); addFlow("#api-pas","#ms-3",C_MEM);
+    flowDecision(s, C_WARN);
     memberDecision("pend", s);
     bumpMetric("pend");
   } else {
@@ -847,7 +862,7 @@ async function submitDtr(){
       <div class="kv">${driver.denyReason}</div>
       <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
       ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
-    addFlow("#um-"+s.um,"#ehrDecision",C_DEN); addFlow("#api-pas","#ms-3",C_MEM);
+    flowDecision(s, C_DEN);
     memberDecision("den", s);
     bumpMetric("den");
   }
@@ -895,7 +910,10 @@ async function cdexFlow(){
   const auth=c.authPrefix+"-CDX-"+Math.floor(10000+Math.random()*90000);
   trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth} · documentation gap closed via network query — no fax, no portal, no phone call`);
   updateQueue(paId, "Approved via CDex", "appr");
-  addFlow("#um-"+s.um,"#ehrDecision",C_OK); addFlow("#api-pas","#ms-3",C_MEM);
+  trace(s.epp
+    ? `<span class="ok">[Router→EPP→Epic]</span> Approved authorization written back into <b>Epic</b> via EPP (final push)`
+    : `<span class="ok">[Router→eHX→${s.emr}]</span> Approved authorization written back into <b>${s.emr}</b> via <b>eHealth Exchange proxy SMART-on-FHIR</b> (final push)`);
+  flowDecision(s, C_OK);
   $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span>
     <h4 style="margin-top:8px">Prior authorization approved after CDex record retrieval</h4>
     <div class="kv">Authorization #: <span>${auth}</span></div>
@@ -922,7 +940,7 @@ function updateQueue(id, status, cls){
 function resetFlow(){
   ["crd","dtr","pas"].forEach(k=>setApi(k,""));
   document.querySelectorAll(".um").forEach(u=>u.classList.remove("routed"));
-  ["net-ehx","net-hsx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
+  ["net-ehx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
   clearFlows();
@@ -951,8 +969,8 @@ const TOUR = [
    say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ pick('cons','No', document.querySelector('[data-q=cons] button:nth-child(2)')); await sleep(400); await submitDtr(); }},
   {title:"Denied — with a specific reason", body:"PAS routed to <b>eviCore</b> and returned a <b>denial with the exact policy citation</b> (CMS-0057 requires specific reasons). The member app (right) shows the status and appeal rights. Now click the CDex button.",
    say:"P A S routed the request to eviCore, which returned a denial with the exact policy citation. C M S rule fifty-seven requires a specific reason. The member app on the right shows the status and appeal rights. Now let's use CDex.", action:async()=>{ if($("cdexBtn")){ await cdexFlow(); } }},
-  {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>HSX</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
-   say:"The hub issued a CDex task, found the patient over the H S X health information exchange, pulled the physical therapy records from Rothman's E H R, attached them, and re-adjudicated to approved. No fax, no phone call. Watch the metrics bar update at the top.", action:()=>{}},
+  {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>eHealth Exchange</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
+   say:"The hub issued a CDex task, found the patient over the eHealth Exchange network, pulled the physical therapy records from Rothman's E H R, attached them, and re-adjudicated to approved. No fax, no phone call. Watch the metrics bar update at the top.", action:()=>{}},
   {title:"That's the story", body:"Order → CRD → DTR → PAS → InterQual → decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios — each routes to a different delegated vendor.",
    say:"That's the full story: order, to C R D, to D T R, to P A S, through InterQual, to a decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios. Each one routes to a different delegated vendor.", action:()=>{ endGuided(); }}
 ];
