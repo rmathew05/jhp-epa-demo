@@ -192,6 +192,10 @@
           <option value="pcs">Personal Care Services — HCPCS T1019</option>
           <option value="pdn">Private Duty Nursing — HCPCS T1000</option>
           </optgroup>
+          <optgroup label="── Epic EMR via EPP ──">
+          <option value="cmr">Cardiac MRI (Epic) — CPT 75561</option>
+          <option value="hha">Skilled Home Health (Epic) — HCPCS G0299</option>
+          </optgroup>
         </select>
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
       </div>
@@ -224,9 +228,10 @@
       </div>
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex</h3>
-      <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls clinical data directly from provider EHRs</span></div>
         <div class="um" id="net-hsx"><b>HSX</b><span class="role">HealthShare Exchange · Regional HIE</span></div>
+        <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
       </div>
 
       <h3 class="sec">PAS Intake Queue</h3>
@@ -543,6 +548,40 @@ const SCEN = {
       docs:["Physician order — vent/trach management, 16h skilled nursing (DocumentReference/ord-4410)","Pulmonology progress note · trach-dependent"],
       authPrefix:"ELG", note:"Skilled need confirmed by physician order — private duty nursing approved on re-adjudication."}
   },
+  cmr: {
+    label:"Cardiac MRI (Epic)", code:"CPT 75561", paRequired:true, epp:true,
+    um:"evicore", umName:"eviCore", umRole:"Cardiology Imaging",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"I42.0 — Dilated cardiomyopathy", type:"text"},
+      {id:"prior", q:"Recent echocardiogram showing reduced EF or diagnostic uncertainty documented?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per cardiac imaging policy, cardiac MRI requires a recent echo establishing reduced EF or unresolved diagnostic question. Pended — records requested from Epic via EPP."},
+      {id:"sympt", q:"Presenting symptoms", prefill:"NYHA Class II dyspnea, palpitations", type:"text"}
+    ],
+    approve:{auth:"EVC-CARD-418820", note:"Valid 45 days · Regional Cardiology · single study"},
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Regional Cardiology (Epic)",
+      docs:["Echocardiogram report — LVEF 32%, dilated LV (DocumentReference/echo-5560)","Cardiology consult note"],
+      authPrefix:"EVC", note:"Echo with reduced EF retrieved from Epic via EPP — cardiac MRI approved on re-adjudication."}
+  },
+  hha: {
+    label:"Skilled Home Health (Epic)", code:"HCPCS G0299", paRequired:true, epp:true,
+    um:"mhk", umName:"MHK", umRole:"Core UM / Home Health",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"I50.9 — Heart failure, unspecified", type:"text"},
+      {id:"homebound", q:"Homebound status and skilled nursing need documented by physician?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per policy JHP-HH-006, skilled home health requires documented homebound status and a physician-certified skilled need. Pended — plan of care requested from Epic via EPP."},
+      {id:"freq", q:"Requested visit frequency", prefill:"Skilled nursing 3×/week, 60 days", type:"text"}
+    ],
+    interqual:{set:"InterQual® 2026 — Home Care", criteria:[
+      {c:"Homebound status documented", key:true},
+      {c:"Physician-certified skilled need", key:true},
+      {c:"Plan of care signed and time-limited"}]},
+    approve:{auth:"MHK-HH-52071", note:"Skilled nursing 3×/week ×60 days · plan of care on file"},
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Regional Home Health (Epic)",
+      docs:["Physician certification of homebound status (DocumentReference/hh-3361)","Signed plan of care (CMS-485)"],
+      authPrefix:"MHK", note:"Homebound certification + plan of care retrieved from Epic via EPP — home health approved on re-adjudication."}
+  },
 };
 
 let state = null;
@@ -674,12 +713,19 @@ async function submitDtr(){
   setApi("pas","active");
   const paId="PA-"+Math.floor(100000+Math.random()*900000);
   state.paId=paId;
-  trace(`<span class="sys">[EHR→PAS]</span> Claim/$submit · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
+  if(s.epp){
+    trace(`<span class="sys">[Epic→EPP→PAS]</span> PA submitted natively from <b>Epic</b> via <b>Epic Payer Platform (EPP)</b> · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
+    $("net-epp").classList.add("routed");
+  } else {
+    trace(`<span class="sys">[EHR→PAS]</span> Claim/$submit · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
+  }
   addQueue(paId, s, "Received");
   await sleep(900);
 
   // routing
-  trace(`<span class="sys">[HUB]</span> Routing rules: ${s.code} → <b>${s.umName}</b> (${s.umRole}) · X12 278 translated at edge`);
+  trace(s.epp
+    ? `<span class="sys">[EPP→UM]</span> Epic Payer Platform routes ${s.code} to <b>${s.umName}</b> (${s.umRole}) · payer adjudication`
+    : `<span class="sys">[HUB]</span> Routing rules: ${s.code} → <b>${s.umName}</b> (${s.umRole}) · X12 278 translated at edge`);
   $("um-"+s.um).classList.add("routed");
   updateQueue(paId, `Routed → ${s.umName}`, "");
   memberStep(2);
@@ -756,13 +802,21 @@ async function cdexFlow(){
   const btn=$("cdexBtn");
   btn.disabled=true; btn.textContent="CDex request in flight…";
 
-  trace(`<span class="sys">[HUB→CDex]</span> Task created · code=<b>data-request-query</b> · reasonReference: Claim/${paId} · requester: JHP UM`);
-  $("net-ehx").classList.add("routed");
-  await sleep(900);
-  trace(`<span class="sys">[CDex→${c.netName}]</span> Patient discovery (IHE XCPD) · Gonzalez, Maria · DOB 03/14/1968 · match found @ <b>${c.source}</b>`);
-  if(c.net==="hsx") $("net-hsx").classList.add("routed");
-  await sleep(1000);
-  trace(`<span class="sys">[${c.netName}→${c.source}]</span> Document query (XCA / FHIR DocumentReference search)`);
+  const isEpp = c.net==="epp";
+  $("net-"+c.net).classList.add("routed");
+  if(isEpp){
+    trace(`<span class="sys">[EPP→Epic]</span> Data request via <b>Epic Payer Platform</b> · reasonReference: Claim/${paId}`);
+    await sleep(900);
+    trace(`<span class="sys">[EPP↔Epic]</span> Payer Platform links payer ↔ <b>${c.source}</b> · records shared natively (no query/retrieve handoff)`);
+    await sleep(1000);
+    trace(`<span class="sys">[Epic→EPP]</span> Clinical documents released through Epic Payer Platform`);
+  } else {
+    trace(`<span class="sys">[HUB→CDex]</span> Task created · code=<b>data-request-query</b> · reasonReference: Claim/${paId} · requester: JHP UM`);
+    await sleep(900);
+    trace(`<span class="sys">[CDex→${c.netName}]</span> Patient discovery (IHE XCPD) · Gonzalez, Maria · DOB 03/14/1968 · match found @ <b>${c.source}</b>`);
+    await sleep(1000);
+    trace(`<span class="sys">[${c.netName}→${c.source}]</span> Document query (XCA / FHIR DocumentReference search)`);
+  }
   await sleep(1000);
   c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
   await sleep(800);
@@ -808,6 +862,7 @@ function updateQueue(id, status, cls){
 function resetFlow(){
   ["crd","dtr","pas"].forEach(k=>setApi(k,""));
   document.querySelectorAll(".um").forEach(u=>u.classList.remove("routed"));
+  ["net-ehx","net-hsx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   memberReset();
 }
