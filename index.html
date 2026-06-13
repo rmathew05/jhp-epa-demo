@@ -835,9 +835,10 @@ function trace(msg, cls=""){
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 /* ---------- STEP MODE: gate each stage on a Next click ---------- */
 let stepMode=false, gateResolve=null;
+const HOP_MS = 2000; // 2-second pause between each hop in auto-play
 function gate(ms){
   if(stepMode){ return new Promise(res=>{ gateResolve=res; showNext(true); }); }
-  return sleep(ms);
+  return sleep(HOP_MS);
 }
 function doNext(){ if(gateResolve){ const r=gateResolve; gateResolve=null; showNext(false); r(); } }
 function showNext(on){ const b=$("nextStepBtn"); if(b) b.style.display = on ? "inline-block" : "none"; }
