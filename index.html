@@ -221,29 +221,29 @@
       <div class="order-row">
         <select id="orderSel">
           <optgroup label="──  Epic  (ePA + write-back via EPP)  ──">
-          <option value="pt">Physical Therapy ×12 visits — CPT 97110</option>
+          <option value="pt">🏥 Physical Therapy ×12 visits — CPT 97110</option>
           <option value="rx">💊 Skyrizi (risankizumab) — J2327 · pharmacy</option>
           <option value="ozempic">💊 Ozempic (semaglutide) — Rx · pharmacy</option>
-          <option value="pet">PET/CT Staging, oncologic — CPT 78815</option>
-          <option value="immuno">Keytruda (pembrolizumab) — J9271</option>
-          <option value="imrt">IMRT Radiation Therapy — CPT 77385</option>
-          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455</option>
-          <option value="cmr">Cardiac MRI — CPT 75561</option>
-          <option value="hha">Skilled Home Health — HCPCS G0299</option>
+          <option value="pet">🩻 PET/CT Staging, oncologic — CPT 78815</option>
+          <option value="immuno">🩻 Keytruda (pembrolizumab) — J9271</option>
+          <option value="imrt">🩻 IMRT Radiation Therapy — CPT 77385</option>
+          <option value="genomic">🩻 Comprehensive Genomic Profiling — CPT 81455</option>
+          <option value="cmr">🩻 Cardiac MRI — CPT 75561</option>
+          <option value="hha">🏥 Skilled Home Health — HCPCS G0299</option>
           </optgroup>
           <optgroup label="──  eCW  (write-back via eHealth Exchange)  ──">
-          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148</option>
-          <option value="dental">Dental Crown, porcelain/ceramic — D2740</option>
-          <option value="tka">Total Knee Arthroplasty — CPT 27447</option>
+          <option value="mri">🩻 MRI Lumbar Spine w/o contrast — CPT 72148</option>
+          <option value="dental">🦷 Dental Crown, porcelain/ceramic — D2740</option>
+          <option value="tka">🩻 Total Knee Arthroplasty — CPT 27447</option>
           <option value="humira">💊 Humira (adalimumab) — Rx · pharmacy</option>
-          <option value="pcs">Personal Care Services — HCPCS T1019</option>
+          <option value="pcs">🏠 Personal Care Services — HCPCS T1019</option>
           </optgroup>
           <optgroup label="──  Oracle  (write-back via eHealth Exchange)  ──">
-          <option value="bh">Behavioral Health IOP — H0015</option>
-          <option value="cpap">CPAP Device (DME) — E0601</option>
+          <option value="bh">🧠 Behavioral Health IOP — H0015</option>
+          <option value="cpap">🏥 CPAP Device (DME) — E0601</option>
           <option value="dupixent">💊 Dupixent (dupilumab) — Rx · pharmacy</option>
-          <option value="vision">Scleral Contact Lenses, keratoconus — V2531</option>
-          <option value="pdn">Private Duty Nursing — HCPCS T1000</option>
+          <option value="vision">👁️ Scleral Contact Lenses, keratoconus — V2531</option>
+          <option value="pdn">🏠 Private Duty Nursing — HCPCS T1000</option>
           </optgroup>
         </select>
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
@@ -269,13 +269,13 @@
       <h3 class="sec">UM Routing</h3>
       <div class="um orchestrator" id="um-router"><b>JHP ePA Router</b><span class="role">SMART on FHIR orchestrator · coordinates all delegated UM vendors</span></div>
       <div class="um-grid">
-        <div class="um" id="um-evicore"><b>eviCore</b><span class="role">Radiology / MSK</span></div>
-        <div class="um" id="um-optum"><b>Optum BH</b><span class="role">Behavioral Health</span></div>
-        <div class="um" id="um-avesis"><b>Avesis</b><span class="role">Dental</span></div>
-        <div class="um" id="um-mhk"><b>MHK</b><span class="role">Core UM · Epic Tapestry in 2028</span></div>
-        <div class="um" id="um-esi"><b>ESI (CMS-0062)</b><span class="role">Pharmacy</span></div>
-        <div class="um" id="um-davis"><b>Davis</b><span class="role">Vision</span></div>
-        <div class="um" id="um-elligint"><b>Helios (Elligint Health)</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
+        <div class="um" id="um-evicore"><b>🩻 eviCore</b><span class="role">Radiology / MSK</span></div>
+        <div class="um" id="um-optum"><b>🧠 Optum BH</b><span class="role">Behavioral Health</span></div>
+        <div class="um" id="um-avesis"><b>🦷 Avesis</b><span class="role">Dental</span></div>
+        <div class="um" id="um-mhk"><b>🏥 MHK</b><span class="role">Core UM · Epic Tapestry in 2028</span></div>
+        <div class="um" id="um-esi"><b>💊 ESI (CMS-0062)</b><span class="role">Pharmacy</span></div>
+        <div class="um" id="um-davis"><b>👁️ Davis</b><span class="role">Vision</span></div>
+        <div class="um" id="um-elligint"><b>🏠 Helios (Elligint Health)</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
       </div>
 
       <h3 class="sec">Clinical Criteria Engine</h3>
