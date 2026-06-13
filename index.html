@@ -271,7 +271,7 @@
         <div class="um" id="um-mhk"><b>MHK</b><span class="role">Core UM · Epic Tapestry in 2028</span></div>
         <div class="um" id="um-esi"><b>ESI (CMS-0062)</b><span class="role">Pharmacy</span></div>
         <div class="um" id="um-davis"><b>Davis</b><span class="role">Vision</span></div>
-        <div class="um" id="um-elligint"><b>Elligint Health — Helios</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
+        <div class="um" id="um-elligint"><b>Helios (Elligint Health)</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
       </div>
 
       <h3 class="sec">Clinical Criteria Engine</h3>
@@ -563,7 +563,7 @@ const SCEN = {
   },
   pcs: {
     label:"Personal Care Services", code:"HCPCS T1019", paRequired:true, emr:"eCW",
-    um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
+    um:"elligint", umName:"Helios (Elligint Health)", umRole:"LTSS",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"I69.351 — Hemiplegia following cerebral infarction", type:"text"},
       {id:"assess", q:"Functional needs assessment documenting ADL deficits completed?", type:"yn", drives:true,
@@ -582,7 +582,7 @@ const SCEN = {
   },
   pdn: {
     label:"Private Duty Nursing", code:"HCPCS T1000", paRequired:true, emr:"Oracle",
-    um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
+    um:"elligint", umName:"Helios (Elligint Health)", umRole:"LTSS",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"J96.10 — Chronic respiratory failure · tracheostomy-dependent", type:"text"},
       {id:"skilled", q:"Skilled nursing need (vent/trach management) documented by physician?", type:"yn", drives:true,
