@@ -174,27 +174,27 @@
       <h3 class="sec">New Order</h3>
       <div class="order-row">
         <select id="orderSel">
-          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148</option>
-          <option value="bh">Behavioral Health IOP — H0015</option>
-          <option value="dental">Dental Crown, porcelain/ceramic — D2740</option>
-          <option value="tka">Total Knee Arthroplasty — CPT 27447</option>
-          <option value="pt">Physical Therapy ×12 visits — CPT 97110</option>
-          <option value="cpap">CPAP Device (DME) — E0601</option>
-          <option value="rx">Skyrizi (risankizumab) — J2327</option>
-          <option value="vision">Scleral Contact Lenses, keratoconus — V2531</option>
+          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148 · eCW</option>
+          <option value="bh">Behavioral Health IOP — H0015 · Oracle</option>
+          <option value="dental">Dental Crown, porcelain/ceramic — D2740 · eCW</option>
+          <option value="tka">Total Knee Arthroplasty — CPT 27447 · eCW</option>
+          <option value="pt">Physical Therapy ×12 visits — CPT 97110 · Epic</option>
+          <option value="cpap">CPAP Device (DME) — E0601 · Oracle</option>
+          <option value="rx">Skyrizi (risankizumab) — J2327 · Epic</option>
+          <option value="vision">Scleral Contact Lenses, keratoconus — V2531 · Oracle</option>
           <optgroup label="── Oncology ──">
-          <option value="pet">PET/CT Staging, oncologic — CPT 78815</option>
-          <option value="immuno">Keytruda (pembrolizumab) — J9271</option>
-          <option value="imrt">IMRT Radiation Therapy — CPT 77385</option>
-          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455</option>
+          <option value="pet">PET/CT Staging, oncologic — CPT 78815 · Epic</option>
+          <option value="immuno">Keytruda (pembrolizumab) — J9271 · Epic</option>
+          <option value="imrt">IMRT Radiation Therapy — CPT 77385 · Epic</option>
+          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455 · Epic</option>
           </optgroup>
           <optgroup label="── LTSS (Elligint Helios) ──">
-          <option value="pcs">Personal Care Services — HCPCS T1019</option>
-          <option value="pdn">Private Duty Nursing — HCPCS T1000</option>
+          <option value="pcs">Personal Care Services — HCPCS T1019 · eCW</option>
+          <option value="pdn">Private Duty Nursing — HCPCS T1000 · Oracle</option>
           </optgroup>
           <optgroup label="── Epic EMR via EPP ──">
-          <option value="cmr">Cardiac MRI (Epic) — CPT 75561</option>
-          <option value="hha">Skilled Home Health (Epic) — HCPCS G0299</option>
+          <option value="cmr">Cardiac MRI — CPT 75561 · Epic</option>
+          <option value="hha">Skilled Home Health — HCPCS G0299 · Epic</option>
           </optgroup>
         </select>
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
@@ -228,12 +228,11 @@
         <div class="um" id="um-elligint"><b>Elligint Health — Helios</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
       </div>
 
-      <h3 class="sec">Clinical Data Exchange — Da Vinci CDex</h3>
-      <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
+      <h3 class="sec">Clinical Data Exchange — Da Vinci CDex or IHE</h3>
+      <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls clinical data directly from provider EHRs</span></div>
         <div class="um" id="net-hsx"><b>HSX</b><span class="role">HealthShare Exchange · Regional HIE</span></div>
         <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
-        <div class="um" id="net-ihe"><b>IHE Profiles</b><span class="role">XCPD / XCA / XDS.b · cross-community patient discovery, document query &amp; retrieve</span></div>
       </div>
 
       <h3 class="sec">PAS Intake Queue</h3>
@@ -865,7 +864,7 @@ function updateQueue(id, status, cls){
 function resetFlow(){
   ["crd","dtr","pas"].forEach(k=>setApi(k,""));
   document.querySelectorAll(".um").forEach(u=>u.classList.remove("routed"));
-  ["net-ehx","net-hsx","net-epp","net-ihe"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
+  ["net-ehx","net-hsx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
   memberReset();
