@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JHP ePA Demo — Da Vinci Burden Reduction (CRD / DTR / PAS)</title>
+<style>
+  :root{
+    --jhp-blue:#0b4f8a; --jhp-blue-dark:#083a66; --jhp-accent:#1273c4;
+    --bg:#eef2f6; --panel:#ffffff; --line:#d7dee6; --ink:#1c2733; --muted:#5d6b7a;
+    --green:#1e7e45; --green-bg:#e7f5ec; --amber:#9a6700; --amber-bg:#fdf3d7;
+    --red:#b3261e; --red-bg:#fbe9e7; --purple:#5b3fa8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink); font-size:14px;}
+  header{background:var(--jhp-blue); color:#fff; padding:10px 20px; display:flex; align-items:center; gap:14px;}
+  header .logo{font-weight:700; font-size:17px; letter-spacing:.3px;}
+  header .logo span{color:#9cc8ee; font-weight:400;}
+  header .tag{font-size:11.5px; background:rgba(255,255,255,.14); padding:3px 10px; border-radius:20px;}
+  header .reset{margin-left:auto;}
+  button{font-family:inherit; cursor:pointer;}
+  .btn{background:var(--jhp-accent); color:#fff; border:none; border-radius:6px; padding:8px 16px; font-size:13.5px; font-weight:600;}
+  .btn:hover{background:var(--jhp-blue);}
+  .btn:disabled{background:#b7c4cf; cursor:not-allowed;}
+  .btn.ghost{background:#fff; color:var(--jhp-accent); border:1px solid var(--jhp-accent);}
+  .btn.ghost:hover{background:#eaf3fb;}
+  .layout{display:grid; grid-template-columns:1.1fr 1.1fr .85fr; gap:14px; padding:14px; max-width:1500px; margin:0 auto;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; min-height:540px;}
+  .panel-head{padding:12px 16px; min-height:64px; display:flex; flex-direction:column; justify-content:center; gap:3px;}
+  .panel-head .ttl{font-weight:700; font-size:13px; letter-spacing:.4px; text-transform:uppercase; display:flex; align-items:center; gap:7px;}
+  .panel-head .sub{font-weight:400; letter-spacing:0; color:rgba(255,255,255,.82); font-size:11.5px; line-height:1.35;}
+  .ehr .panel-head{background:#7a1f2b; color:#fff;}
+  .payer .panel-head{background:var(--jhp-blue-dark); color:#fff;}
+  .panel-body{padding:16px; flex:1;}
+  .pt-banner{background:#f4f7fa; border:1px solid var(--line); border-radius:8px; padding:10px 14px; display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;}
+  .pt-banner b{font-size:15px;}
+  .pt-banner .kv{font-size:12px; color:var(--muted);}
+  .pt-banner .kv span{color:var(--ink); font-weight:600;}
+  h3.sec{font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:14px 0 8px;}
+  select,input{font-family:inherit; font-size:13.5px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; width:100%;}
+  .order-row{display:flex; gap:10px; align-items:center;}
+  .order-row select{flex:1;}
+  .card{border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-top:12px;}
+  .card.crd{border-left:4px solid var(--jhp-accent); background:#f3f8fd;}
+  .card.crd.nopa{border-left-color:var(--green); background:var(--green-bg);}
+  .card h4{font-size:13.5px; margin-bottom:4px;}
+  .card p{font-size:13px; color:var(--muted); margin-bottom:8px;}
+  .badge{display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:12px; letter-spacing:.3px;}
+  .badge.req{background:var(--amber-bg); color:var(--amber);}
+  .badge.no{background:var(--green-bg); color:var(--green);}
+  .badge.appr{background:var(--green-bg); color:var(--green);}
+  .badge.pend{background:var(--amber-bg); color:var(--amber);}
+  .badge.den{background:var(--red-bg); color:var(--red);}
+  .decision{border-radius:8px; padding:14px; margin-top:12px; border:1px solid;}
+  .decision.appr{background:var(--green-bg); border-color:#b4dec4;}
+  .decision.pend{background:var(--amber-bg); border-color:#ecd9a0;}
+  .decision.den{background:var(--red-bg); border-color:#efc4bf;}
+  .decision h4{font-size:14px; margin-bottom:6px;}
+  .decision .kv{font-size:12.5px; margin-top:3px;}
+  .decision .kv span{font-weight:700;}
+  /* payer side */
+  .api-rail{display:flex; gap:10px; margin-bottom:14px;}
+  .api{flex:1; border:1.5px solid var(--line); border-radius:8px; padding:10px; text-align:center; transition:all .3s;}
+  .api .nm{font-weight:700; font-size:14px;}
+  .api .ds{font-size:10.5px; color:var(--muted); margin-top:2px;}
+  .api.active{border-color:var(--jhp-accent); background:#eaf3fb; box-shadow:0 0 0 3px rgba(18,115,196,.15);}
+  .api.done{border-color:var(--green); background:var(--green-bg);}
+  .um-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .um{border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; transition:all .3s;}
+  .um b{display:block; font-size:13px;}
+  .um .role{color:var(--muted); font-size:11px;}
+  .um.routed{border-color:var(--purple); background:#f1edfb; box-shadow:0 0 0 3px rgba(91,63,168,.12);}
+  .queue-item{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; display:flex; align-items:center; gap:10px; font-size:13px;}
+  .queue-item .grow{flex:1;}
+  .queue-item .id{font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--muted);}
+  .empty{color:var(--muted); font-size:12.5px; font-style:italic; padding:8px 0;}
+  /* trace */
+  .trace-wrap{max-width:1500px; margin:0 auto 18px; padding:0 14px;}
+  .trace{background:#0e1822; border-radius:10px; padding:14px 16px; min-height:120px; max-height:260px; overflow-y:auto;}
+  .trace-head{color:#8fb8dd; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;}
+  .tl{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; line-height:1.75; color:#c9d8e6; white-space:pre-wrap;}
+  .tl .t{color:#5d7a94;}
+  .tl .sys{color:#7ec8ff; font-weight:600;}
+  .tl .ok{color:#6fd394;}
+  .tl .warn{color:#e8c468;}
+  .tl .err{color:#f08f86;}
+  /* modal */
+  .overlay{position:fixed; inset:0; background:rgba(10,25,40,.55); display:none; align-items:center; justify-content:center; z-index:50;}
+  .overlay.show{display:flex;}
+  .modal{background:#fff; border-radius:12px; width:560px; max-width:92vw; max-height:88vh; overflow-y:auto;}
+  .modal-head{background:var(--jhp-blue); color:#fff; padding:12px 18px; border-radius:12px 12px 0 0;}
+  .modal-head h3{font-size:15px;}
+  .modal-head p{font-size:11.5px; color:#bcd8ef; margin-top:2px;}
+  .modal-body{padding:18px;}
+  .q{margin-bottom:14px;}
+  .q label{display:block; font-size:13px; font-weight:600; margin-bottom:6px;}
+  .q .prefill{font-size:11px; color:var(--green); font-weight:600; margin-left:6px;}
+  .q .opts{display:flex; gap:8px; flex-wrap:wrap;}
+  .q .opts button{border:1.5px solid var(--line); background:#fff; border-radius:6px; padding:7px 14px; font-size:13px;}
+  .q .opts button.sel{border-color:var(--jhp-accent); background:#eaf3fb; font-weight:700; color:var(--jhp-blue);}
+  .modal-foot{padding:0 18px 18px; display:flex; justify-content:flex-end; gap:10px;}
+  .note{font-size:11.5px; color:var(--muted); background:#f4f7fa; border-radius:6px; padding:8px 10px; margin-bottom:14px;}
+  .pulse{animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{50%{opacity:.55;}}
+  /* metrics bar */
+  .metrics{max-width:1500px; margin:14px auto 0; padding:0 14px; display:grid; grid-template-columns:repeat(5,1fr); gap:12px;}
+  .metric{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px;}
+  .metric .v{font-size:24px; font-weight:800; color:var(--jhp-blue); line-height:1;}
+  .metric .v small{font-size:13px; font-weight:700; color:var(--muted);}
+  .metric .l{font-size:11px; color:var(--muted); margin-top:5px; text-transform:uppercase; letter-spacing:.4px;}
+  .metric.hl .v{color:var(--green);}
+  .metric .delta{font-size:10.5px; color:var(--green); font-weight:600; margin-top:2px;}
+  /* member panel */
+  .member .panel-head{background:#0d6b6b; color:#fff;}
+  .mstep{display:flex; gap:10px; align-items:flex-start; padding:8px 0; opacity:.4; transition:opacity .3s;}
+  .mstep.on{opacity:1;}
+  .mstep .dot{width:22px; height:22px; border-radius:50%; background:var(--line); color:#fff; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:700;}
+  .mstep.on .dot{background:#0d6b6b;}
+  .mstep.on.appr .dot{background:var(--green);} .mstep.on.den .dot{background:var(--red);} .mstep.on.pend .dot{background:var(--amber);}
+  .mstep .mt{font-size:13px; font-weight:600;}
+  .mstep .md{font-size:11.5px; color:var(--muted);}
+  .idcard{background:linear-gradient(135deg,#0d6b6b,#0b4f8a); color:#fff; border-radius:10px; padding:14px; margin-top:6px;}
+  .idcard .row{display:flex; justify-content:space-between; font-size:11px; opacity:.85; margin-top:6px;}
+  .idcard .row b{font-size:13px; opacity:1; font-weight:700;}
+  .idcard .brand{font-size:12px; letter-spacing:1px; opacity:.9;}
+  .letter{border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px; font-size:12.5px; background:#fbfdff;}
+  .letter h5{font-size:12px; margin-bottom:4px;}
+  /* guided narrator */
+  .narrator{position:fixed; right:18px; bottom:18px; width:340px; background:#0e1822; color:#e7f0f8; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.35); z-index:60; display:none; overflow:hidden;}
+  .narrator.show{display:block;}
+  .narrator .nh{background:#16263a; padding:10px 14px; font-size:12px; font-weight:700; letter-spacing:.4px; display:flex; align-items:center; gap:8px;}
+  .narrator .nh .step{margin-left:auto; font-weight:400; color:#8fb8dd; font-size:11px;}
+  .narrator .nb{padding:14px; font-size:13px; line-height:1.5;}
+  .narrator .nb b{color:#7ec8ff;}
+  .narrator .nf{padding:0 14px 14px; display:flex; gap:8px; justify-content:flex-end;}
+  .narrator .nf button{border-radius:6px; padding:7px 14px; font-size:12.5px; font-weight:600; border:none;}
+  .narrator .skip{background:transparent; color:#8fb8dd; border:1px solid #2b3e54 !important;}
+  .narrator .next{background:var(--jhp-accent); color:#fff;}
+  @media (max-width:1100px){.layout{grid-template-columns:1fr;} .metrics{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">JHP <span>| Interoperability Hub — ePA Prototype</span></div>
+  <div class="tag">Da Vinci CRD · DTR · PAS · CDex</div>
+  <div class="tag">CMS-0057-F</div>
+  <button class="btn reset" style="margin-left:auto" onclick="startGuided()">▶ Guided demo</button>
+  <button class="btn ghost" onclick="resetDemo()">↺ Reset</button>
+</header>
+
+<!-- METRICS / ROI -->
+<div class="metrics" id="metrics">
+  <div class="metric"><div class="v" id="m-total">0</div><div class="l">PA requests</div></div>
+  <div class="metric hl"><div class="v" id="m-touchless">0<small>%</small></div><div class="l">Touchless auto-approval</div></div>
+  <div class="metric"><div class="v" id="m-turn">&lt;1<small> min</small></div><div class="l">Avg turnaround</div><div class="delta">vs 3–5 days manual</div></div>
+  <div class="metric hl"><div class="v" id="m-cdex">0</div><div class="l">Doc gaps closed via CDex</div></div>
+  <div class="metric"><div class="v" id="m-saved">0<small> hrs</small></div><div class="l">Provider time saved</div></div>
+</div>
+
+<div class="layout">
+
+  <!-- PROVIDER EHR -->
+  <div class="panel ehr">
+    <div class="panel-head"><span class="ttl">🏥 Provider EHR System Workflow</span><span class="sub">Epic / eCW / Oracle · SMART on FHIR flow</span></div>
+    <div class="panel-body">
+      <div class="pt-banner">
+        <div><b>Maria Gonzalez</b><div class="kv">DOB <span>03/14/1968</span> · F · 58y</div></div>
+        <div class="kv">Member ID<br><span>JHP-88451203</span></div>
+        <div class="kv">Plan<br><span>JHP Medicaid HMO</span></div>
+        <div class="kv">PCP<br><span>Dr. R. Patel, Jefferson Internal Medicine</span></div>
+      </div>
+
+      <h3 class="sec">New Order</h3>
+      <div class="order-row">
+        <select id="orderSel">
+          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148</option>
+          <option value="bh">Behavioral Health IOP — H0015</option>
+          <option value="dental">Dental Crown, porcelain/ceramic — D2740</option>
+          <option value="tka">Total Knee Arthroplasty — CPT 27447</option>
+          <option value="pt">Physical Therapy ×12 visits — CPT 97110</option>
+          <option value="cpap">CPAP Device (DME) — E0601</option>
+          <option value="rx">Skyrizi (risankizumab) — J2327</option>
+          <option value="vision">Scleral Contact Lenses, keratoconus — V2531</option>
+          <optgroup label="── Oncology ──">
+          <option value="pet">PET/CT Staging, oncologic — CPT 78815</option>
+          <option value="immuno">Keytruda (pembrolizumab) — J9271</option>
+          <option value="imrt">IMRT Radiation Therapy — CPT 77385</option>
+          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455</option>
+          </optgroup>
+          <optgroup label="── LTSS (Elligint Helios) ──">
+          <option value="pcs">Personal Care Services — HCPCS T1019</option>
+          <option value="pdn">Private Duty Nursing — HCPCS T1000</option>
+          </optgroup>
+          <option value="visit">Office Visit, established — CPT 99213</option>
+        </select>
+        <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
+      </div>
+
+      <div id="crdCard"></div>
+      <div id="dtrStatus"></div>
+      <div id="ehrDecision"></div>
+    </div>
+  </div>
+
+  <!-- PAYER HUB -->
+  <div class="panel payer">
+    <div class="panel-head"><span class="ttl">☁️ JHP Azure Interoperability Hub</span><span class="sub">Workflow at payer with delegated vendors</span></div>
+    <div class="panel-body">
+      <div class="api-rail">
+        <div class="api" id="api-crd"><div class="nm">CRD</div><div class="ds">Coverage Requirements Discovery</div></div>
+        <div class="api" id="api-dtr"><div class="nm">DTR</div><div class="ds">Documentation Templates &amp; Rules</div></div>
+        <div class="api" id="api-pas"><div class="nm">PAS</div><div class="ds">Prior Auth Support</div></div>
+      </div>
+
+      <h3 class="sec">UM Routing</h3>
+      <div class="um-grid">
+        <div class="um" id="um-evicore"><b>eviCore</b><span class="role">Radiology / MSK</span></div>
+        <div class="um" id="um-optum"><b>Optum BH</b><span class="role">Behavioral Health</span></div>
+        <div class="um" id="um-avesis"><b>Avesis</b><span class="role">Dental</span></div>
+        <div class="um" id="um-mhk"><b>MHK</b><span class="role">Core UM · Epic Tapestry in 2028</span></div>
+        <div class="um" id="um-esi"><b>ESI (CMS-0062)</b><span class="role">Pharmacy</span></div>
+        <div class="um" id="um-davis"><b>Davis</b><span class="role">Vision</span></div>
+        <div class="um" id="um-elligint"><b>Elligint Health — Helios</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
+      </div>
+
+      <h3 class="sec">Clinical Data Exchange — Da Vinci CDex</h3>
+      <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls clinical data directly from provider EHRs</span></div>
+        <div class="um" id="net-hsx"><b>HSX</b><span class="role">HealthShare Exchange · Regional HIE</span></div>
+      </div>
+
+      <h3 class="sec">PAS Intake Queue</h3>
+      <div id="queue"><div class="empty">No prior auth requests yet.</div></div>
+    </div>
+  </div>
+
+  <!-- MEMBER VIEW -->
+  <div class="panel member">
+    <div class="panel-head"><span class="ttl">📱 Member View</span><span class="sub">JHP member app · patient access (CMS-0057)</span></div>
+    <div class="panel-body">
+      <div class="idcard">
+        <div class="brand">JHP · Jefferson Health Plans</div>
+        <div class="row"><span>Member</span><b>Maria Gonzalez</b></div>
+        <div class="row"><span>Member ID</span><b>JHP-88451203</b></div>
+        <div class="row"><span>Plan</span><b>Medicaid HMO</b></div>
+        <div class="row"><span>RxBIN / PCP</span><b>003858 · Dr. Patel</b></div>
+      </div>
+
+      <h3 class="sec">Authorization Status</h3>
+      <div id="memberSteps">
+        <div class="mstep" id="ms-1"><div class="dot">1</div><div><div class="mt">Service ordered</div><div class="md">Your provider submitted a request</div></div></div>
+        <div class="mstep" id="ms-2"><div class="dot">2</div><div><div class="mt">Reviewed by plan</div><div class="md">Coverage &amp; clinical criteria checked</div></div></div>
+        <div class="mstep" id="ms-3"><div class="dot">3</div><div><div class="mt">Decision</div><div class="md">Outcome and next steps</div></div></div>
+      </div>
+      <div id="memberLetter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW TRACE -->
+<div class="trace-wrap">
+  <div class="trace">
+    <div class="trace-head">Live FHIR Flow Trace</div>
+    <div class="tl" id="trace"><span class="t">—</span> Waiting for activity. Sign an order in the EHR to begin.</div>
+  </div>
+</div>
+
+<!-- DTR MODAL -->
+<div class="overlay" id="dtrModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="dtrTitle">DTR — Documentation Questionnaire</h3>
+      <p>SMART on FHIR app · launched from EHR · answers prefilled from chart via CQL</p>
+    </div>
+    <div class="modal-body">
+      <div class="note">✦ Fields marked <b style="color:var(--green)">prefilled</b> were auto-populated from the patient's FHIR record — the provider only confirms.</div>
+      <div id="dtrQs"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeDtr()">Cancel</button>
+      <button class="btn" id="dtrSubmit" onclick="submitDtr()">Submit & Send PA (PAS)</button>
+    </div>
+  </div>
+</div>
+
+<!-- GUIDED NARRATOR -->
+<div class="narrator" id="narrator">
+  <div class="nh">🎬 Guided Demo
+    <button id="voiceToggle" onclick="toggleVoice()" title="Toggle voiceover" style="margin-left:8px;background:transparent;border:1px solid #2b3e54;color:#8fb8dd;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;">🔊 Voice</button>
+    <span class="step" id="narStep"></span></div>
+  <div class="nb" id="narBody"></div>
+  <div class="nf">
+    <button class="skip" onclick="endGuided()">Exit</button>
+    <button class="next" id="narNext" onclick="narAdvance()">Next ▶</button>
+  </div>
+</div>
+
+<script>
+const SCEN = {
+  mri: {
+    label:"MRI Lumbar Spine w/o contrast", code:"CPT 72148", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"Radiology",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"M54.16 — Radiculopathy, lumbar region", type:"text"},
+      {id:"dur", q:"Duration of symptoms", prefill:"8 weeks (from problem list)", type:"text"},
+      {id:"cons", q:"Completed ≥6 weeks of conservative therapy (PT / NSAIDs)?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Conservative therapy not documented. Per policy JHP-RAD-014, 6 weeks of PT/NSAIDs required before advanced imaging."},
+      {id:"neuro", q:"Progressive neurologic deficit present?", type:"yn"}
+    ],
+    approve:{auth:"EVC-2026-118394", note:"Valid 60 days · Jefferson Methodist Imaging Center"},
+    cdex:{net:"hsx", netName:"HSX", source:"Rothman Orthopaedics (eCW)",
+      docs:["PT progress notes — 8 weeks conservative therapy (DocumentReference/pt-4471)","Medication history — NSAID course, 10 weeks"],
+      authPrefix:"EVC", note:"Conservative therapy documented at Rothman — denial overturned on re-adjudication."}
+  },
+  bh: {
+    label:"Behavioral Health IOP", code:"H0015", paRequired:true,
+    um:"optum", umName:"Optum BH", umRole:"Behavioral Health",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"F33.1 — Major depressive disorder, recurrent, moderate", type:"text"},
+      {id:"phq", q:"Most recent PHQ-9 score", prefill:"18 (from flowsheet, 06/02/2026)", type:"text"},
+      {id:"lvl", q:"Current level of care attempted", type:"choice", opts:["Outpatient therapy","None"], drives:true,
+        map:{"Outpatient therapy":"pend","None":"pend"},
+        pendReason:"Medical necessity review required — routed to Optum BH clinical reviewer (decision SLA: 72h expedited / 7d standard)."}
+    ],
+    pend:{ref:"OBH-RV-55102", note:"Pended for clinical review · provider will be notified via EHR in-basket"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Behavioral Health (Epic)",
+      docs:["Outpatient therapy notes — 12 sessions (DocumentReference/bh-9920)","PHQ-9 trend flowsheet — 6 months"],
+      authPrefix:"OBH", note:"Medical necessity confirmed by Optum BH reviewer using retrieved records."}
+  },
+  dental: {
+    label:"Dental Crown, porcelain/ceramic", code:"D2740", paRequired:true,
+    um:"avesis", umName:"Avesis", umRole:"Dental",
+    questionnaire:[
+      {id:"tooth", q:"Tooth number", prefill:"#19 (from dental chart)", type:"text"},
+      {id:"xray", q:"Radiograph attached showing fracture / decay?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Missing radiograph — Avesis requires imaging. Request pended; attach via DTR and resubmit."},
+    ],
+    approve:{auth:"AVS-D-77621", note:"Valid 90 days · in-network dental provider required"},
+    pend:{ref:"AVS-P-77622", note:"Pended — awaiting radiograph attachment"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Dental Clinic (Epic)",
+      docs:["Periapical radiograph, tooth #19 (DocumentReference/img-2291)"],
+      authPrefix:"AVS", note:"Radiograph retrieved and attached — Avesis approved on re-adjudication."}
+  },
+  tka: {
+    label:"Total Knee Arthroplasty", code:"CPT 27447", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"MSK",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"M17.11 — Unilateral primary osteoarthritis, right knee", type:"text"},
+      {id:"img", q:"Weight-bearing X-ray findings", prefill:"KL Grade 4, bone-on-bone (radiology report 05/18/2026)", type:"text"},
+      {id:"cons", q:"Conservative management completed", type:"choice", drives:true,
+        opts:["3+ months, documented","Less than 3 months"],
+        map:{"3+ months, documented":"approve","Less than 3 months":"pend"},
+        pendReason:"Per policy JHP-MSK-021, 3 months of conservative management (PT, injections, NSAIDs) must be documented before TKA. Pended for records."},
+      {id:"bmi", q:"BMI", prefill:"31.2 (from vitals)", type:"text"}
+    ],
+    approve:{auth:"EVC-MSK-204417", note:"Valid 90 days · Rothman Orthopaedics at Jefferson · includes 3-day inpatient stay"},
+    cdex:{net:"hsx", netName:"HSX", source:"Rothman Orthopaedics (eCW)",
+      docs:["PT course — 14 weeks (DocumentReference/pt-8812)","Corticosteroid injection records ×2","Orthopedic consult notes"],
+      authPrefix:"EVC", note:"Conservative management documented at Rothman — approved on re-adjudication."}
+  },
+  pt: {
+    label:"Physical Therapy, 12 visits", code:"CPT 97110", paRequired:true,
+    um:"mhk", umName:"MHK", umRole:"Core UM",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"M25.561 — Pain in right knee", type:"text"},
+      {id:"eval", q:"Initial PT evaluation documents functional deficit?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Initial PT evaluation with objective functional measures required (policy JHP-REHAB-008). Pended for documentation."},
+      {id:"prior", q:"Visits used this benefit year", prefill:"0 of 30 (from accumulator)", type:"text"}
+    ],
+    interqual:{set:"InterQual® 2026 — Outpatient Rehabilitation & Therapy", criteria:[
+      {c:"Functional deficit documented on standardized measure", key:true},
+      {c:"Skilled therapy required (not maintenance level)"},
+      {c:"Expected measurable improvement within 90 days"}]},
+    approve:{auth:"MHK-PT-66120", note:"12 visits authorized · valid 90 days · auto-adjudicated in MHK"},
+    cdex:{net:"hsx", netName:"HSX", source:"Jefferson Rehab Medicine (Epic)",
+      docs:["PT initial evaluation with LEFS score 42/80 (DocumentReference/pt-3307)"],
+      authPrefix:"MHK", note:"Functional deficit documented — auto-approved in MHK."}
+  },
+  cpap: {
+    label:"CPAP Device (DME)", code:"E0601", paRequired:true,
+    um:"mhk", umName:"MHK", umRole:"Core UM / DME",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"G47.33 — Obstructive sleep apnea", type:"text"},
+      {id:"study", q:"Sleep study with AHI ≥ 15 events/hr documented?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"No qualifying sleep study on file. Per policy JHP-DME-002, polysomnography or home sleep test with AHI ≥ 15 (or ≥ 5 with comorbidities) is required for CPAP coverage."},
+      {id:"supplier", q:"DME supplier", prefill:"AdaptHealth (in-network)", type:"text"}
+    ],
+    interqual:{set:"InterQual® 2026 — DME: Positive Airway Pressure Therapy", criteria:[
+      {c:"OSA confirmed by polysomnography or home sleep test", key:true},
+      {c:"AHI ≥ 15, or ≥ 5 with documented comorbidities", key:true},
+      {c:"Prescribing provider follow-up plan in place"}]},
+    approve:{auth:"MHK-DME-90233", note:"10-month rental-to-own · compliance data required at 90 days"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Sleep Disorders Center (Epic)",
+      docs:["Polysomnography report — AHI 28.4 (DocumentReference/sleep-5521)"],
+      authPrefix:"MHK", note:"Qualifying sleep study retrieved — denial overturned, CPAP approved."}
+  },
+  rx: {
+    label:"Skyrizi (risankizumab)", code:"J2327", paRequired:true,
+    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"L40.50 — Arthropathic psoriasis", type:"text"},
+      {id:"step", q:"Tried and failed conventional DMARD (e.g., methotrexate ≥ 3 months)?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Step therapy not met. Per formulary policy JHP-RX-114, a conventional DMARD trial (methotrexate or equivalent, ≥ 3 months) is required before IL-23 inhibitors."},
+      {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 04/22/2026", type:"text"}
+    ],
+    approve:{auth:"ESI-SP-31178", note:"12-month authorization · dispensed via Accredo specialty pharmacy"},
+    cdex:{net:"hsx", netName:"HSX", source:"Jefferson Rheumatology (Epic)",
+      docs:["Medication history — methotrexate 20mg, 16 weeks, inadequate response (DocumentReference/med-7740)","Rheumatology progress note"],
+      authPrefix:"ESI", note:"Step therapy requirement satisfied by retrieved medication history — approved."}
+  },
+  vision: {
+    label:"Scleral Contact Lenses, keratoconus", code:"V2531", paRequired:true,
+    um:"davis", umName:"Davis", umRole:"Vision",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"H18.601 — Keratoconus, unspecified, right eye", type:"text"},
+      {id:"topo", q:"Corneal topography attached confirming diagnosis?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Davis requires corneal topography or tomography confirming keratoconus before approving medically necessary contact lenses. Pended for imaging."},
+      {id:"va", q:"Best corrected acuity with spectacles", prefill:"20/70 OD (from exam 05/30/2026)", type:"text"}
+    ],
+    approve:{auth:"DVS-MN-44892", note:"Medically necessary lenses · 1 pair per year · in-network provider"},
+    pend:{ref:"DVS-P-44893", note:"Pended — awaiting corneal topography"},
+    cdex:{net:"hsx", netName:"HSX", source:"Wills Eye Hospital (Epic)",
+      docs:["Pentacam corneal tomography — Kmax 58.1D (DocumentReference/eye-1184)"],
+      authPrefix:"DVS", note:"Topography retrieved from Wills Eye — medically necessary lenses approved."}
+  },
+  pet: {
+    label:"PET/CT Staging, oncologic", code:"CPT 78815", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"Oncology Imaging",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — Malignant neoplasm, upper lobe, right lung", type:"text"},
+      {id:"tissue", q:"Tissue/cytology diagnosis of malignancy documented?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per NCCN imaging-appropriateness criteria, initial oncologic PET/CT requires a confirmed tissue diagnosis. Pended pending pathology."},
+      {id:"intent", q:"Imaging indication", prefill:"Initial staging (newly diagnosed)", type:"text"}
+    ],
+    interqual:{engine:"NCCN", set:"NCCN Imaging Appropriate Use Criteria — NSCLC", criteria:[
+      {c:"Tissue diagnosis of malignancy confirmed", key:true},
+      {c:"Staging not yet established by prior imaging"},
+      {c:"Result will change management"}]},
+    approve:{auth:"EVC-ONC-512204", note:"Valid 45 days · Sidney Kimmel Cancer Center · single staging study"},
+    cdex:{net:"hsx", netName:"HSX", source:"Sidney Kimmel Cancer Center (Epic)",
+      docs:["Surgical pathology — adenocarcinoma, CT-guided biopsy RUL (DocumentReference/path-3382)"],
+      authPrefix:"EVC", note:"Tissue diagnosis retrieved from SKCC — staging PET/CT approved on re-adjudication."}
+  },
+  immuno: {
+    label:"Keytruda (pembrolizumab)", code:"J9271", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"Medical Oncology",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, right upper lobe, Stage IV", type:"text"},
+      {id:"biomarker", q:"PD-L1 expression (TPS) documented and EGFR/ALK status known?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Biomarker testing not on file. Per NCCN Compendium, first-line pembrolizumab monotherapy requires PD-L1 TPS ≥ 1% and negative EGFR/ALK. Resubmit with biomarker results."},
+      {id:"ecog", q:"ECOG performance status", prefill:"1 (from oncology note 06/01/2026)", type:"text"}
+    ],
+    interqual:{engine:"NCCN", set:"NCCN Drugs & Biologics Compendium — NSCLC, 1st line", criteria:[
+      {c:"PD-L1 TPS ≥ 1% documented", key:true},
+      {c:"EGFR / ALK negative (no targetable driver)", key:true},
+      {c:"ECOG performance status 0–2"}]},
+    approve:{auth:"EVC-ONC-512788", note:"Authorized ×4 cycles · re-review at restaging · dispensed via SKCC infusion"},
+    cdex:{net:"hsx", netName:"HSX", source:"SKCC Molecular Pathology (Epic)",
+      docs:["Biomarker report — PD-L1 TPS 65%, EGFR wild-type, ALK negative (DocumentReference/mol-7741)","NGS panel result"],
+      authPrefix:"EVC", note:"PD-L1 high, no targetable driver — NCCN criteria met, denial overturned and pembrolizumab approved."}
+  },
+  imrt: {
+    label:"IMRT Radiation Therapy", code:"CPT 77385", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"Radiation Oncology",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, right upper lobe", type:"text"},
+      {id:"plan", q:"Radiation treatment plan + simulation attached justifying IMRT over 3D-CRT?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per NCCN radiation guidelines, IMRT requires a treatment plan demonstrating need to spare critical structures (e.g., cord, esophagus). Pended for plan."},
+      {id:"dose", q:"Prescribed dose / fractionation", prefill:"60 Gy in 30 fractions", type:"text"}
+    ],
+    interqual:{engine:"NCCN", set:"NCCN Radiation Therapy Criteria — Thoracic", criteria:[
+      {c:"Treatment plan documents organ-at-risk sparing need", key:true},
+      {c:"Dose/fractionation within guideline range"},
+      {c:"Curative or definitive intent established"}]},
+    approve:{auth:"EVC-RO-330145", note:"Full course authorized · 30 fractions · Bodine Center for Radiation Oncology"},
+    cdex:{net:"hsx", netName:"HSX", source:"SKCC Radiation Oncology (Epic)",
+      docs:["IMRT treatment plan + DVH, cord max 42 Gy (DocumentReference/ro-9912)","CT simulation report"],
+      authPrefix:"EVC", note:"Plan confirms OAR sparing requirement — IMRT approved on re-adjudication."}
+  },
+  genomic: {
+    label:"Comprehensive Genomic Profiling", code:"CPT 81455", paRequired:true,
+    um:"evicore", umName:"eviCore", umRole:"Lab Management",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, Stage IV (metastatic)", type:"text"},
+      {id:"stage", q:"Advanced/metastatic solid tumor confirmed?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Per NCCN biomarker criteria, comprehensive genomic profiling is covered for advanced/metastatic solid tumors. Early-stage indication not supported; resubmit with staging."},
+      {id:"test", q:"Assay", prefill:"FoundationOne CDx (324-gene panel)", type:"text"}
+    ],
+    interqual:{engine:"NCCN", set:"NCCN Biomarker Compendium — Solid Tumor CGP", criteria:[
+      {c:"Advanced or metastatic solid tumor", key:true},
+      {c:"Results will inform therapy selection"},
+      {c:"Not previously profiled on same specimen"}]},
+    approve:{auth:"EVC-LAB-771032", note:"One assay authorized · results to guide targeted therapy / trial eligibility"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Sidney Kimmel Cancer Center (Epic)",
+      docs:["Staging summary — Stage IV, M1b (DocumentReference/stg-2204)","PET/CT staging report"],
+      authPrefix:"EVC", note:"Metastatic disease confirmed — genomic profiling approved on re-adjudication."}
+  },
+  pcs: {
+    label:"Personal Care Services", code:"HCPCS T1019", paRequired:true,
+    um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"I69.351 — Hemiplegia following cerebral infarction", type:"text"},
+      {id:"assess", q:"Functional needs assessment documenting ADL deficits completed?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per LTSS criteria, personal care hours require a current functional needs assessment scoring ADL/IADL dependencies. Pended pending assessment from the agency."},
+      {id:"hours", q:"Requested service level", prefill:"25 hours/week (from plan of care)", type:"text"}
+    ],
+    interqual:{engine:"Helios LTSS", set:"Helios Functional Eligibility & Level-of-Care Criteria", criteria:[
+      {c:"Current functional needs assessment on file", key:true},
+      {c:"ADL/IADL dependencies support requested hours"},
+      {c:"Person-centered plan of care signed"}]},
+    approve:{auth:"ELG-LTSS-60441", note:"25 hrs/week authorized · 6-month span · reassessment at renewal"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"BAYADA Home Health Care",
+      docs:["Functional needs assessment — ADL score 18/28, requires assist with bathing/transfer/toileting (DocumentReference/fna-7780)","Person-centered plan of care, signed"],
+      authPrefix:"ELG", note:"Assessment retrieved from home care agency — personal care hours approved on re-adjudication."}
+  },
+  pdn: {
+    label:"Private Duty Nursing", code:"HCPCS T1000", paRequired:true,
+    um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"J96.10 — Chronic respiratory failure · tracheostomy-dependent", type:"text"},
+      {id:"skilled", q:"Skilled nursing need (vent/trach management) documented by physician?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Per LTSS level-of-care criteria, private duty nursing requires documented skilled needs (e.g., ventilator/tracheostomy care) with a physician order. Resubmit with clinical documentation."},
+      {id:"hours", q:"Requested service level", prefill:"16 hours/day skilled nursing", type:"text"}
+    ],
+    interqual:{engine:"Helios LTSS", set:"Helios Private Duty Nursing Level-of-Care Criteria", criteria:[
+      {c:"Skilled nursing need physician-ordered", key:true},
+      {c:"Care cannot be safely met by lower level of service", key:true},
+      {c:"Caregiver training/backup plan documented"}]},
+    approve:{auth:"ELG-PDN-60892", note:"16 hrs/day authorized · 90-day span · concurrent review"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Pulmonary / Trach Clinic (Epic)",
+      docs:["Physician order — vent/trach management, 16h skilled nursing (DocumentReference/ord-4410)","Pulmonology progress note · trach-dependent"],
+      authPrefix:"ELG", note:"Skilled need confirmed by physician order — private duty nursing approved on re-adjudication."}
+  },
+  visit: {
+    label:"Office Visit, established patient", code:"CPT 99213", paRequired:false
+  }
+};
+
+let state = null;
+const $ = id => document.getElementById(id);
+
+/* ---------- METRICS ---------- */
+const metrics = {total:0, touchless:0, cdex:0, savedHrs:0};
+function bumpMetric(kind){
+  metrics.total++;
+  if(kind==="touchless") metrics.touchless++;
+  // each electronic PA saves ~0.75 provider hrs vs phone/fax/portal
+  metrics.savedHrs += 0.75;
+  renderMetrics();
+}
+function metricCdexResolve(){
+  // a previously pended/denied request, resolved by network retrieval — not a new request
+  metrics.cdex++; metrics.touchless++;
+  metrics.savedHrs += 1.5;
+  renderMetrics();
+}
+function renderMetrics(){
+  $("m-total").textContent = metrics.total;
+  const pct = metrics.total ? Math.round(100*metrics.touchless/metrics.total) : 0;
+  $("m-touchless").innerHTML = pct+'<small>%</small>';
+  $("m-cdex").textContent = metrics.cdex;
+  $("m-saved").innerHTML = metrics.savedHrs.toFixed(1)+'<small> hrs</small>';
+}
+
+/* ---------- MEMBER VIEW ---------- */
+function memberStep(n, cls){
+  const el=$("ms-"+n); if(!el) return;
+  el.classList.add("on"); if(cls) el.classList.add(cls);
+}
+function memberReset(){
+  [1,2,3].forEach(n=>{ const e=$("ms-"+n); e.className="mstep"; });
+  $("memberLetter").innerHTML="";
+}
+function memberDecision(outcome, s, detail){
+  memberStep(3, outcome);
+  const map={appr:["✓ Approved","Your service has been approved. No action needed — show your member ID at your appointment."],
+             pend:["⏳ Under review","Your plan needs a bit more information from your provider. We'll update you here — no action needed from you."],
+             den:["✕ Not approved","This request wasn't approved yet. Your provider has the specific reason and can resubmit. You have the right to appeal."]};
+  const [h,b]=map[outcome];
+  const sub=$("ms-3").querySelector(".md"); if(sub) sub.textContent = (outcome==="appr"?"Approved":outcome==="pend"?"Pending more info":"Not approved");
+  $("memberLetter").innerHTML=`<div class="letter"><h5>${h} — ${s.label}</h5>
+    <div>${b}</div>${detail?`<div style="margin-top:6px;color:var(--muted)">${detail}</div>`:""}
+    <div style="margin-top:6px;color:var(--muted);font-size:11px">Pushed to JHP member app · Patient Access API (FHIR ExplanationOfBenefit)</div></div>`;
+}
+
+function ts(){ const d=new Date(); return d.toTimeString().slice(0,8); }
+function trace(msg, cls=""){
+  const el=$("trace");
+  if(el.dataset.fresh!=="1"){ el.innerHTML=""; el.dataset.fresh="1"; }
+  el.innerHTML += `<div><span class="t">${ts()}</span>  ${cls?`<span class="${cls}">`:""}${msg}${cls?"</span>":""}</div>`;
+  el.parentElement.scrollTop = el.parentElement.scrollHeight;
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function setApi(id, mode){ const e=$("api-"+id); e.classList.remove("active","done","pulse"); if(mode) e.classList.add(mode); if(mode==="active") e.classList.add("pulse"); }
+
+async function signOrder(){
+  resetFlow();
+  const key=$("orderSel").value, s=SCEN[key];
+  state={key, s, answers:{}};
+  $("signBtn").disabled=true;
+  memberStep(1);
+  trace(`<span class="sys">[EHR→CRD]</span> CDS Hooks <b>order-sign</b> fired · ${s.label} (${s.code}) · Patient/JHP-88451203`);
+  setApi("crd","active");
+  await sleep(900);
+  if(!s.paRequired){
+    setApi("crd","done");
+    memberStep(2); memberStep(3,"appr");
+    trace(`<span class="sys">[CRD→EHR]</span> Card returned: <span class="ok">No prior authorization required</span> — order proceeds, zero provider burden`, "");
+    $("crdCard").innerHTML=`<div class="card crd nopa"><span class="badge no">NO PA REQUIRED</span>
+      <h4 style="margin-top:8px">${s.label} — covered, no authorization needed</h4>
+      <p>CRD checked JHP coverage policy in real time. The order is signed and complete. This is the burden-reduction win: no phone calls, no faxes, no portal.</p></div>`;
+    memberDecision("appr", s, "No prior authorization was required for this service.");
+    bumpMetric("touchless");
+    $("signBtn").disabled=false;
+    return;
+  }
+  setApi("crd","done");
+  trace(`<span class="sys">[CRD→EHR]</span> Card returned: <span class="warn">Prior authorization REQUIRED</span> · policy ref attached · DTR launch link included`);
+  $("crdCard").innerHTML=`<div class="card crd"><span class="badge req">PA REQUIRED</span>
+    <h4 style="margin-top:8px">${s.label} requires prior authorization</h4>
+    <p>JHP coverage policy applies. Launch the DTR questionnaire to collect required documentation — most answers prefill from the chart.</p>
+    <button class="btn" onclick="openDtr()">Launch DTR Questionnaire ➜</button></div>`;
+}
+
+function openDtr(){
+  const s=state.s;
+  setApi("dtr","active");
+  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR app retrieves Questionnaire + CQL prefill logic from JHP hub`);
+  $("dtrTitle").textContent=`DTR — ${s.label}`;
+  let html="";
+  s.questionnaire.forEach(q=>{
+    html+=`<div class="q"><label>${q.q}${q.prefill?'<span class="prefill">✓ prefilled</span>':""}</label>`;
+    if(q.type==="text"){
+      html+=`<input value="${q.prefill||""}" readonly>`;
+    } else if(q.type==="yn"){
+      html+=`<div class="opts" data-q="${q.id}">
+        <button onclick="pick('${q.id}','Yes',this)">Yes</button>
+        <button onclick="pick('${q.id}','No',this)">No</button></div>`;
+    } else if(q.type==="choice"){
+      html+=`<div class="opts" data-q="${q.id}">`+q.opts.map(o=>`<button onclick="pick('${q.id}','${o}',this)">${o}</button>`).join("")+`</div>`;
+    }
+    html+=`</div>`;
+  });
+  $("dtrQs").innerHTML=html;
+  $("dtrModal").classList.add("show");
+}
+function pick(qid,val,btn){
+  state.answers[qid]=val;
+  btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("sel"));
+  btn.classList.add("sel");
+}
+function closeDtr(){ $("dtrModal").classList.remove("show"); setApi("dtr",""); trace(`<span class="warn">[DTR]</span> Questionnaire cancelled by provider`); $("signBtn").disabled=false; }
+
+async function submitDtr(){
+  const s=state.s;
+  const unanswered = s.questionnaire.filter(q=>q.type!=="text" && !state.answers[q.id]);
+  if(unanswered.length){ alert("Please answer: "+unanswered.map(q=>q.q).join(" · ")); return; }
+  $("dtrModal").classList.remove("show");
+  setApi("dtr","done");
+  trace(`<span class="sys">[DTR]</span> QuestionnaireResponse complete · ${s.questionnaire.length} items (${s.questionnaire.filter(q=>q.prefill).length} auto-prefilled via CQL)`);
+  $("dtrStatus").innerHTML=`<div class="card"><b>📋 DTR complete</b><p style="margin:4px 0 0">Documentation packaged with the PA request.</p></div>`;
+  await sleep(500);
+
+  // PAS
+  setApi("pas","active");
+  const paId="PA-"+Math.floor(100000+Math.random()*900000);
+  state.paId=paId;
+  trace(`<span class="sys">[EHR→PAS]</span> Claim/$submit · Bundle{ Claim, QuestionnaireResponse, Patient, Coverage, ServiceRequest } · id ${paId}`);
+  addQueue(paId, s, "Received");
+  await sleep(900);
+
+  // routing
+  trace(`<span class="sys">[HUB]</span> Routing rules: ${s.code} → <b>${s.umName}</b> (${s.umRole}) · X12 278 translated at edge`);
+  $("um-"+s.um).classList.add("routed");
+  updateQueue(paId, `Routed → ${s.umName}`, "");
+  memberStep(2);
+  await sleep(1100);
+
+  // outcome
+  let outcome="approve";
+  const driver=s.questionnaire.find(q=>q.drives);
+  if(driver){
+    const a=state.answers[driver.id];
+    if(driver.map) outcome=driver.map[a]||"pend";
+    else outcome = (a==="Yes") ? driver.yes : driver.no;
+  }
+
+  // Clinical criteria review (InterQual for MHK, NCCN pathways for oncology)
+  if(s.interqual){
+    const eng = s.interqual.engine || "InterQual";
+    trace(`<span class="sys">[${s.umName}]</span> Auto-review against <b>${s.interqual.set}</b>`);
+    await sleep(700);
+    s.interqual.criteria.forEach(cr=>{
+      const fail = outcome!=="approve" && cr.key;
+      trace(fail
+        ? `<span class="err">[${eng}]</span> ✗ ${cr.c} — <b>not documented</b>`
+        : `<span class="ok">[${eng}]</span> ✓ ${cr.c} — met`);
+    });
+    await sleep(700);
+    trace(outcome==="approve"
+      ? `<span class="ok">[${eng}]</span> All criteria MET → auto-approval, no manual review`
+      : `<span class="warn">[${eng}]</span> Criteria NOT met → cannot auto-approve`);
+    await sleep(500);
+  }
+
+  setApi("pas","done");
+  if(outcome==="approve"){
+    trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>APPROVED</b> · Auth # ${s.approve.auth} · returned in seconds, not days`);
+    updateQueue(paId, "Approved", "appr");
+    $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED</span>
+      <h4 style="margin-top:8px">Prior authorization approved</h4>
+      <div class="kv">Authorization #: <span>${s.approve.auth}</span></div>
+      <div class="kv">${s.approve.note}</div>
+      ${s.interqual?`<div class="kv">Clinical criteria: <span>${s.interqual.set}</span> — all criteria met</div>`:""}
+      <div class="kv" style="margin-top:8px;color:var(--muted)">End-to-end: order → CRD → DTR → PAS → decision, entirely inside the EHR workflow.</div></div>`;
+    memberDecision("appr", s, `Authorization #${s.approve.auth}.`);
+    bumpMetric("touchless");
+  } else if(outcome==="pend"){
+    const reason = driver?.pendReason || "Pended for clinical review.";
+    const ref = s.pend?.ref || "RV-"+Math.floor(10000+Math.random()*90000);
+    trace(`<span class="warn">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>PENDED</b> · ${reason}`);
+    updateQueue(paId, "Pended — clinical review", "pend");
+    $("ehrDecision").innerHTML=`<div class="decision pend"><span class="badge pend">PENDED</span>
+      <h4 style="margin-top:8px">Pended for review</h4>
+      <div class="kv">Reference #: <span>${ref}</span></div>
+      <div class="kv">${reason}</div>
+      ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
+      ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+    memberDecision("pend", s);
+    bumpMetric("pend");
+  } else {
+    trace(`<span class="err">[${s.umName}→PAS→EHR]</span> ClaimResponse: <b>DENIED</b> · reason code + policy citation returned (CMS-0057 specific-reason requirement)`);
+    updateQueue(paId, "Denied", "den");
+    $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span>
+      <h4 style="margin-top:8px">Prior authorization denied</h4>
+      <div class="kv">${driver.denyReason}</div>
+      <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
+      ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+    memberDecision("den", s);
+    bumpMetric("den");
+  }
+  $("signBtn").disabled=false;
+}
+
+async function cdexFlow(){
+  const s=state.s, c=s.cdex, paId=state.paId;
+  const btn=$("cdexBtn");
+  btn.disabled=true; btn.textContent="CDex request in flight…";
+
+  trace(`<span class="sys">[HUB→CDex]</span> Task created · code=<b>data-request-query</b> · reasonReference: Claim/${paId} · requester: JHP UM`);
+  $("net-ehx").classList.add("routed");
+  await sleep(900);
+  trace(`<span class="sys">[CDex→${c.netName}]</span> Patient discovery (IHE XCPD) · Gonzalez, Maria · DOB 03/14/1968 · match found @ <b>${c.source}</b>`);
+  if(c.net==="hsx") $("net-hsx").classList.add("routed");
+  await sleep(1000);
+  trace(`<span class="sys">[${c.netName}→${c.source}]</span> Document query (XCA / FHIR DocumentReference search)`);
+  await sleep(1000);
+  c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
+  await sleep(800);
+  trace(`<span class="sys">[CDex→PAS]</span> $submit-attachment · Bundle{ DocumentReference ×${c.docs.length} } linked to Claim/${paId}`);
+  updateQueue(paId, "Re-adjudicating", "req");
+  setApi("pas","active");
+  await sleep(1100);
+  if(s.interqual){
+    const eng = s.interqual.engine || "InterQual";
+    trace(`<span class="sys">[${s.umName}]</span> ${eng} re-review with retrieved documentation · ${s.interqual.set}`);
+    await sleep(700);
+    trace(`<span class="ok">[${eng}]</span> All criteria now MET → auto-approval`);
+    await sleep(500);
+  }
+  setApi("pas","done");
+
+  const auth=c.authPrefix+"-CDX-"+Math.floor(10000+Math.random()*90000);
+  trace(`<span class="ok">[${s.umName}→PAS→EHR]</span> ClaimResponse (updated): <b>APPROVED</b> · Auth # ${auth} · documentation gap closed via network query — no fax, no portal, no phone call`);
+  updateQueue(paId, "Approved via CDex", "appr");
+  $("ehrDecision").innerHTML=`<div class="decision appr"><span class="badge appr">APPROVED — via CDex</span>
+    <h4 style="margin-top:8px">Prior authorization approved after CDex record retrieval</h4>
+    <div class="kv">Authorization #: <span>${auth}</span></div>
+    <div class="kv">Source: <span>${c.source}</span> via ${c.netName}</div>
+    <div class="kv">Documents attached: ${c.docs.length}</div>
+    <div class="kv" style="margin-top:6px">${c.note}</div>
+    <div class="kv" style="margin-top:8px;color:var(--muted)">The payer pulled the missing clinical documentation directly from the treating provider's system over the network — the burden-reduction story end to end.</div></div>`;
+  memberDecision("appr", s, `Resolved automatically — your plan retrieved the needed records. Authorization #${auth}.`);
+  metricCdexResolve();
+}
+
+function addQueue(id, s, status){
+  if($("queue").querySelector(".empty")) $("queue").innerHTML="";
+  $("queue").innerHTML += `<div class="queue-item" id="qi-${id}">
+    <div class="grow"><b>${s.label}</b> <span class="id">${id}</span><br>
+    <span class="id">Gonzalez, Maria · JHP-88451203 · ${s.code}</span></div>
+    <span class="badge req" id="qs-${id}">${status}</span></div>`;
+}
+function updateQueue(id, status, cls){
+  const b=$("qs-"+id); if(!b) return;
+  b.textContent=status; b.className="badge "+(cls||"req");
+}
+
+function resetFlow(){
+  ["crd","dtr","pas"].forEach(k=>setApi(k,""));
+  document.querySelectorAll(".um").forEach(u=>u.classList.remove("routed"));
+  $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
+  memberReset();
+}
+function resetDemo(){
+  resetFlow();
+  $("queue").innerHTML='<div class="empty">No prior auth requests yet.</div>';
+  const el=$("trace"); el.dataset.fresh="0";
+  el.innerHTML='<span class="t">—</span> Waiting for activity. Sign an order in the EHR to begin.';
+  $("signBtn").disabled=false;
+  metrics.total=metrics.touchless=metrics.cdex=metrics.savedHrs=0; renderMetrics();
+}
+
+/* ---------- GUIDED DEMO ---------- */
+const TOUR = [
+  {title:"Welcome", body:"This walks through Jefferson Health Plans' electronic prior auth using Da Vinci <b>CRD → DTR → PAS</b>, with <b>InterQual</b> criteria and <b>CDex</b> record retrieval. Three panels: provider EHR, payer hub, and the member's app.",
+   say:"Welcome. This demo walks through Jefferson Health Plans' electronic prior authorization, built on the Da Vinci standards: C R D, D T R, and P A S, with InterQual criteria and CDex record retrieval. You'll see three panels: the provider's E H R on the left, the payer hub in the center, and the member's app on the right.", action:()=>{ resetDemo(); }},
+  {title:"Pick a scenario", body:"We'll order an <b>MRI Lumbar Spine</b>. The order dropdown is in the provider EHR (left). Watch the payer hub (center) light up as the request flows.",
+   say:"Let's order an M R I of the lumbar spine. The order dropdown is in the provider E H R on the left. Watch the payer hub in the center light up as the request flows through.", action:()=>{ $("orderSel").value="mri"; }},
+  {title:"Sign the order — CRD fires", body:"Signing the order triggers a CDS Hook. <b>CRD</b> checks coverage in real time and tells the provider a prior auth is required — before they ever leave the chart.",
+   say:"Signing the order fires a C D S Hook. Coverage Requirements Discovery checks the plan's policy in real time and tells the provider a prior authorization is required, before they ever leave the chart.", action:async()=>{ await signOrder(); }},
+  {title:"DTR auto-fills the documentation", body:"Launching <b>DTR</b> opens a SMART on FHIR questionnaire. Most fields are <b>prefilled from the chart via CQL</b>. We'll answer the driving question to trigger a denial path first, then rescue it with CDex.",
+   say:"Launching D T R opens a SMART on FHIR questionnaire. Most fields are pre-filled straight from the chart using C Q L logic. We'll answer the key question to trigger a denial first, then rescue it with CDex.", action:()=>{ openDtr(); }},
+  {title:"Answer to force a gap", body:"We'll answer <b>No</b> to 'completed conservative therapy' — simulating documentation that lives at another provider. Then submit to PAS.",
+   say:"We'll answer No to completed conservative therapy. This simulates documentation that actually lives at another provider's system. Now we submit to P A S.", action:async()=>{ pick('cons','No', document.querySelector('[data-q=cons] button:nth-child(2)')); await sleep(400); await submitDtr(); }},
+  {title:"Denied — with a specific reason", body:"PAS routed to <b>eviCore</b> and returned a <b>denial with the exact policy citation</b> (CMS-0057 requires specific reasons). The member app (right) shows the status and appeal rights. Now click the CDex button.",
+   say:"P A S routed the request to eviCore, which returned a denial with the exact policy citation. C M S rule fifty-seven requires a specific reason. The member app on the right shows the status and appeal rights. Now let's use CDex.", action:async()=>{ if($("cdexBtn")){ await cdexFlow(); } }},
+  {title:"CDex closes the gap automatically", body:"The hub issued a <b>CDex Task</b>, found the patient over <b>HSX</b>, pulled the PT records from Rothman's EHR, attached them, and <b>re-adjudicated to approved</b> — no fax, no phone call. Watch the metrics bar update.",
+   say:"The hub issued a CDex task, found the patient over the H S X health information exchange, pulled the physical therapy records from Rothman's E H R, attached them, and re-adjudicated to approved. No fax, no phone call. Watch the metrics bar update at the top.", action:()=>{}},
+  {title:"That's the story", body:"Order → CRD → DTR → PAS → InterQual → decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios — each routes to a different delegated vendor.",
+   say:"That's the full story: order, to C R D, to D T R, to P A S, through InterQual, to a decision, with CDex as the safety net, all surfaced to the member in real time. Try the other scenarios. Each one routes to a different delegated vendor.", action:()=>{ endGuided(); }}
+];
+let tourIdx=-1, tourBusy=false;
+let voiceOn = ('speechSynthesis' in window);
+const synth = voiceOn ? window.speechSynthesis : null;
+function pickVoice(){
+  if(!synth) return null;
+  const vs=synth.getVoices();
+  // prefer a natural en-US voice
+  return vs.find(v=>/Samantha|Google US English|Microsoft (Aria|Jenny|Zira)/i.test(v.name))
+      || vs.find(v=>v.lang==="en-US") || vs[0] || null;
+}
+function speak(text){
+  if(!voiceOn || !synth || !text) return;
+  synth.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  const v=pickVoice(); if(v) u.voice=v;
+  u.rate=1.0; u.pitch=1.0;
+  synth.speak(u);
+}
+function toggleVoice(){
+  voiceOn=!voiceOn;
+  const b=$("voiceToggle");
+  if(voiceOn){ b.innerHTML="🔊 Voice"; b.style.color="#8fb8dd"; if(tourIdx>=0&&TOUR[tourIdx]) speak(TOUR[tourIdx].say); }
+  else { b.innerHTML="🔇 Muted"; b.style.color="#6b7c8e"; if(synth) synth.cancel(); }
+}
+function startGuided(){ tourIdx=-1; $("narrator").classList.add("show"); if(synth) synth.getVoices(); narAdvance(); }
+function endGuided(){ $("narrator").classList.remove("show"); tourIdx=-1; if(synth) synth.cancel(); }
+async function narAdvance(){
+  if(tourBusy) return;
+  tourIdx++;
+  if(tourIdx>=TOUR.length){ endGuided(); return; }
+  const step=TOUR[tourIdx];
+  $("narStep").textContent=`${tourIdx+1} / ${TOUR.length}`;
+  $("narBody").innerHTML=`<b>${step.title}</b><br>${step.body}`;
+  $("narNext").textContent = (tourIdx===TOUR.length-1) ? "Finish ✓" : "Next ▶";
+  speak(step.say);
+  tourBusy=true; $("narNext").disabled=true;
+  try{ await step.action(); }catch(e){}
+  tourBusy=false; $("narNext").disabled=false;
+}
+// voices load asynchronously in some browsers
+if(synth) synth.onvoiceschanged = ()=>{};
+</script>
+</body>
+</html>
