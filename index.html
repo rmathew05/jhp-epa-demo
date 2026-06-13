@@ -286,6 +286,7 @@
         <div class="um" id="net-ehx"><b>eHX — eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls data from provider EHRs · proxy SMART-on-FHIR write-back to non-Epic EMRs</span></div>
         <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
       </div>
+      <div id="cdexAction" style="margin-top:8px"></div>
 
       <h3 class="sec">PAS Intake Queue</h3>
       <div id="queue"><div class="empty">No prior auth requests yet.</div></div>
@@ -1014,8 +1015,8 @@ async function submitDtr(){
       <h4 style="margin-top:8px">Pended for review</h4>
       <div class="kv">Reference #: <span>${ref}</span></div>
       <div class="kv">${reason}</div>
-      ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}
-      ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Retrieve records via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+      ${s.pend?`<div class="kv">${s.pend.note}</div>`:""}</div>`;
+    showCdexAction(s);
     renderFlows();
     memberDecision("pend", s);
     bumpMetric("pend");
@@ -1028,8 +1029,8 @@ async function submitDtr(){
     $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span>
       <h4 style="margin-top:8px">Prior authorization denied</h4>
       <div class="kv">${driver.denyReason}</div>
-      <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div>
-      ${s.cdex?`<button class="btn" style="margin-top:10px" id="cdexBtn" onclick="cdexFlow()">Search HIE for documentation via CDex (${s.cdex.netName}) ➜</button>`:""}</div>`;
+      <div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F — provider can address the gap and resubmit through the same flow.</div></div>`;
+    showCdexAction(s);
     renderFlows();
     memberDecision("den", s);
     bumpMetric("den");
@@ -1040,7 +1041,7 @@ async function submitDtr(){
 async function cdexFlow(){
   const s=state.s, c=s.cdex, paId=state.paId;
   const btn=$("cdexBtn");
-  btn.disabled=true; btn.textContent="CDex request in flight…";
+  if(btn){ btn.disabled=true; btn.textContent="CDex request in flight…"; }
 
   const isEpp = c.net==="epp";
   $("net-"+c.net).classList.add("routed");
@@ -1092,10 +1093,18 @@ async function cdexFlow(){
     <div class="kv" style="margin-top:6px">${c.note}</div>
     <div class="kv" style="margin-top:8px;color:var(--muted)">The payer pulled the missing clinical documentation directly from the treating provider's system over the network — the burden-reduction story end to end.</div></div>`;
   renderFlows();
+  $("cdexAction").innerHTML="";
   memberDecision("appr", s, `Resolved automatically — your plan retrieved the needed records. Authorization #${auth}.`);
   metricCdexResolve();
 }
 
+// CDex "request additional information" action — shown on the PAYER side
+function showCdexAction(s){
+  const code = (s.cdex && s.cdex.net==="epp") ? "EPP" : "eHX";
+  $("cdexAction").innerHTML = s.cdex
+    ? `<button class="btn" style="width:100%" id="cdexBtn" onclick="cdexFlow()">Request additional information via CDex (${code}) ➜</button>`
+    : "";
+}
 function addQueue(id, s, status){
   if($("queue").querySelector(".empty")) $("queue").innerHTML="";
   $("queue").innerHTML += `<div class="queue-item" id="qi-${id}">
@@ -1114,6 +1123,7 @@ function resetFlow(){
   ["net-ehx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
+  const ca=$("cdexAction"); if(ca) ca.innerHTML="";
   const cr=$("criteriaRole"); if(cr) cr.textContent="Evidence-based medical-necessity criteria — checked by MHK before adjudicating";
   clearFlows();
   clearGate();
@@ -1200,12 +1210,12 @@ const TOUR = [
      addFlow("#api-pas","#net-ehx",C_DEN); await sleep(450); addFlow("#net-ehx","#ehrDecision",C_DEN);
      trace(`<span class="err">[PAS→eHX→${M.emr}]</span> denial + specific reason returned to ${M.emr} via eHealth Exchange proxy`);
      $("ehrDecision").innerHTML=`<div class="decision den"><span class="badge den">DENIED</span><h4 style="margin-top:8px">Prior authorization denied</h4><div class="kv">${M.questionnaire.find(q=>q.drives).denyReason}</div><div class="kv" style="margin-top:8px;color:var(--muted)">Specific denial reason returned electronically per CMS-0057-F.</div></div>`;
-     addFlow("#api-pas","#ms-3",C_MEM); memberDecision("den",M); bumpMetric("den"); renderFlows(); }},
+     addFlow("#api-pas","#ms-3",C_MEM); memberDecision("den",M); bumpMetric("den"); showCdexAction(M); renderFlows(); }},
 
   {title:"CDex retrieves the missing records",
    body:"The hub fires a <b>CDex Task</b>, finds the patient over <b>eHealth Exchange</b>, and pulls the PT records from <b>Rothman (eCW)</b> — no fax, no phone call.",
    say:"The hub fires a CDex task, finds the patient over eHealth Exchange, and pulls the physical therapy records from Rothman's eClinicalWorks system. No fax, no phone call.",
-   action:async()=>{ const c=SCEN.mri.cdex; addFlow("#um-evicore","#net-ehx",C_CDEX);
+   action:async()=>{ const c=SCEN.mri.cdex; $("cdexAction").innerHTML=""; addFlow("#um-evicore","#net-ehx",C_CDEX);
      trace(`<span class="sys">[HUB→CDex]</span> Task data-request-query → eHealth Exchange · match @ ${c.source}`);
      await sleep(550); c.docs.forEach(d=>trace(`<span class="ok">[${c.source}→HUB]</span> Retrieved: ${d}`));
      addFlow("#net-ehx","#um-evicore",C_CDEX);
