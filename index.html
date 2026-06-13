@@ -75,6 +75,8 @@
   .orchestrator{border:1.5px solid var(--jhp-accent); background:#eaf3fb; margin-bottom:8px;}
   .orchestrator b{color:var(--jhp-blue);}
   .orchestrator .role{color:var(--jhp-accent);}
+  .criteria-box{border:1.5px solid var(--green); background:#eef7f0;}
+  .criteria-box b{color:var(--green);}
   .queue-item{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; display:flex; align-items:center; gap:10px; font-size:13px;}
   .queue-item .grow{flex:1;}
   .queue-item .id{font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--muted);}
@@ -265,6 +267,9 @@
         <div class="um" id="um-davis"><b>Davis</b><span class="role">Vision</span></div>
         <div class="um" id="um-elligint"><b>Elligint Health — Helios</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
       </div>
+
+      <h3 class="sec">Clinical Criteria Engine</h3>
+      <div class="um criteria-box" id="criteria"><b>Clinical Criteria</b><span class="role" id="criteriaRole">InterQual · NCCN Compendium · Helios LTSS — evidence-based medical-necessity rules the UM vendor checks before adjudicating</span></div>
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex or IHE</h3>
       <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
@@ -854,10 +859,14 @@ async function submitDtr(){
     else outcome = (a==="Yes") ? driver.yes : driver.no;
   }
 
-  // Clinical criteria review (InterQual for MHK, NCCN pathways for oncology)
+  // Clinical criteria review (InterQual for MHK, NCCN pathways for oncology, Helios for LTSS)
   if(s.interqual){
     const eng = s.interqual.engine || "InterQual";
-    trace(`<span class="sys">[${s.umName}]</span> Auto-review against <b>${s.interqual.set}</b>`);
+    // light the criteria engine box, label it with the active rule set, and connect the vendor to it
+    $("criteria").classList.add("routed");
+    $("criteriaRole").innerHTML = `<b style="color:var(--ink)">${eng}</b> · ${s.interqual.set} — consulted by ${s.umName}`;
+    addFlow("#um-"+s.um, "#criteria", C_OK);
+    trace(`<span class="sys">[${s.umName}→${eng}]</span> Auto-review against <b>${s.interqual.set}</b>`);
     await gate(700);
     s.interqual.criteria.forEach(cr=>{
       const fail = outcome!=="approve" && cr.key;
@@ -866,9 +875,10 @@ async function submitDtr(){
         : `<span class="ok">[${eng}]</span> ✓ ${cr.c} — met`);
     });
     await gate(700);
+    addFlow("#criteria", "#um-"+s.um, outcome==="approve"?C_OK:C_WARN);
     trace(outcome==="approve"
-      ? `<span class="ok">[${eng}]</span> All criteria MET → auto-approval, no manual review`
-      : `<span class="warn">[${eng}]</span> Criteria NOT met → cannot auto-approve`);
+      ? `<span class="ok">[${eng}→${s.umName}]</span> All criteria MET → auto-approval, no manual review`
+      : `<span class="warn">[${eng}→${s.umName}]</span> Criteria NOT met → cannot auto-approve`);
     await gate(500);
   }
 
@@ -956,9 +966,12 @@ async function cdexFlow(){
   await gate(1100);
   if(s.interqual){
     const eng = s.interqual.engine || "InterQual";
-    trace(`<span class="sys">[${s.umName}]</span> ${eng} re-review with retrieved documentation · ${s.interqual.set}`);
+    $("criteria").classList.add("routed");
+    addFlow("#um-"+s.um, "#criteria", C_OK);
+    trace(`<span class="sys">[${s.umName}→${eng}]</span> ${eng} re-review with retrieved documentation · ${s.interqual.set}`);
     await gate(700);
-    trace(`<span class="ok">[${eng}]</span> All criteria now MET → auto-approval`);
+    addFlow("#criteria", "#um-"+s.um, C_OK);
+    trace(`<span class="ok">[${eng}→${s.umName}]</span> All criteria now MET → auto-approval`);
     await gate(500);
   }
   setApi("pas","done");
@@ -1000,6 +1013,7 @@ function resetFlow(){
   ["net-ehx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
   const et=$("emrTag"); if(et) et.innerHTML="";
+  const cr=$("criteriaRole"); if(cr) cr.textContent="InterQual · NCCN Compendium · Helios LTSS — evidence-based medical-necessity rules the UM vendor checks before adjudicating";
   clearFlows();
   clearGate();
   memberReset();
