@@ -199,6 +199,7 @@
         </select>
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
       </div>
+      <div id="emrTag" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
 
       <div id="crdCard"></div>
       <div id="dtrStatus"></div>
@@ -228,10 +229,11 @@
       </div>
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex</h3>
-      <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
         <div class="um" id="net-ehx"><b>eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls clinical data directly from provider EHRs</span></div>
         <div class="um" id="net-hsx"><b>HSX</b><span class="role">HealthShare Exchange · Regional HIE</span></div>
         <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
+        <div class="um" id="net-ihe"><b>IHE Profiles</b><span class="role">XCPD / XCA / XDS.b · cross-community patient discovery, document query &amp; retrieve</span></div>
       </div>
 
       <h3 class="sec">PAS Intake Queue</h3>
@@ -303,7 +305,7 @@
 <script>
 const SCEN = {
   mri: {
-    label:"MRI Lumbar Spine w/o contrast", code:"CPT 72148", paRequired:true,
+    label:"MRI Lumbar Spine w/o contrast", code:"CPT 72148", paRequired:true, emr:"eCW",
     um:"evicore", umName:"eviCore", umRole:"Radiology",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"M54.16 — Radiculopathy, lumbar region", type:"text"},
@@ -319,7 +321,7 @@ const SCEN = {
       authPrefix:"EVC", note:"Conservative therapy documented at Rothman — denial overturned on re-adjudication."}
   },
   bh: {
-    label:"Behavioral Health IOP", code:"H0015", paRequired:true,
+    label:"Behavioral Health IOP", code:"H0015", paRequired:true, emr:"Oracle",
     um:"optum", umName:"Optum BH", umRole:"Behavioral Health",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"F33.1 — Major depressive disorder, recurrent, moderate", type:"text"},
@@ -329,12 +331,12 @@ const SCEN = {
         pendReason:"Medical necessity review required — routed to Optum BH clinical reviewer (decision SLA: 72h expedited / 7d standard)."}
     ],
     pend:{ref:"OBH-RV-55102", note:"Pended for clinical review · provider will be notified via EHR in-basket"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Behavioral Health (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Behavioral Health (Oracle)",
       docs:["Outpatient therapy notes — 12 sessions (DocumentReference/bh-9920)","PHQ-9 trend flowsheet — 6 months"],
       authPrefix:"OBH", note:"Medical necessity confirmed by Optum BH reviewer using retrieved records."}
   },
   dental: {
-    label:"Dental Crown, porcelain/ceramic", code:"D2740", paRequired:true,
+    label:"Dental Crown, porcelain/ceramic", code:"D2740", paRequired:true, emr:"eCW",
     um:"avesis", umName:"Avesis", umRole:"Dental",
     questionnaire:[
       {id:"tooth", q:"Tooth number", prefill:"#19 (from dental chart)", type:"text"},
@@ -344,12 +346,12 @@ const SCEN = {
     ],
     approve:{auth:"AVS-D-77621", note:"Valid 90 days · in-network dental provider required"},
     pend:{ref:"AVS-P-77622", note:"Pended — awaiting radiograph attachment"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Dental Clinic (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Dental Clinic (eCW)",
       docs:["Periapical radiograph, tooth #19 (DocumentReference/img-2291)"],
       authPrefix:"AVS", note:"Radiograph retrieved and attached — Avesis approved on re-adjudication."}
   },
   tka: {
-    label:"Total Knee Arthroplasty", code:"CPT 27447", paRequired:true,
+    label:"Total Knee Arthroplasty", code:"CPT 27447", paRequired:true, emr:"eCW",
     um:"evicore", umName:"eviCore", umRole:"MSK",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"M17.11 — Unilateral primary osteoarthritis, right knee", type:"text"},
@@ -366,7 +368,7 @@ const SCEN = {
       authPrefix:"EVC", note:"Conservative management documented at Rothman — approved on re-adjudication."}
   },
   pt: {
-    label:"Physical Therapy, 12 visits", code:"CPT 97110", paRequired:true,
+    label:"Physical Therapy, 12 visits", code:"CPT 97110", paRequired:true, emr:"Epic", epp:true,
     um:"mhk", umName:"MHK", umRole:"Core UM",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"M25.561 — Pain in right knee", type:"text"},
@@ -380,12 +382,12 @@ const SCEN = {
       {c:"Skilled therapy required (not maintenance level)"},
       {c:"Expected measurable improvement within 90 days"}]},
     approve:{auth:"MHK-PT-66120", note:"12 visits authorized · valid 90 days · auto-adjudicated in MHK"},
-    cdex:{net:"hsx", netName:"HSX", source:"Jefferson Rehab Medicine (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Jefferson Rehab Medicine (Epic)",
       docs:["PT initial evaluation with LEFS score 42/80 (DocumentReference/pt-3307)"],
       authPrefix:"MHK", note:"Functional deficit documented — auto-approved in MHK."}
   },
   cpap: {
-    label:"CPAP Device (DME)", code:"E0601", paRequired:true,
+    label:"CPAP Device (DME)", code:"E0601", paRequired:true, emr:"Oracle",
     um:"mhk", umName:"MHK", umRole:"Core UM / DME",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"G47.33 — Obstructive sleep apnea", type:"text"},
@@ -399,12 +401,12 @@ const SCEN = {
       {c:"AHI ≥ 15, or ≥ 5 with documented comorbidities", key:true},
       {c:"Prescribing provider follow-up plan in place"}]},
     approve:{auth:"MHK-DME-90233", note:"10-month rental-to-own · compliance data required at 90 days"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Sleep Disorders Center (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Sleep Disorders Center (Oracle)",
       docs:["Polysomnography report — AHI 28.4 (DocumentReference/sleep-5521)"],
       authPrefix:"MHK", note:"Qualifying sleep study retrieved — denial overturned, CPAP approved."}
   },
   rx: {
-    label:"Skyrizi (risankizumab)", code:"J2327", paRequired:true,
+    label:"Skyrizi (risankizumab)", code:"J2327", paRequired:true, emr:"Epic", epp:true,
     um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"L40.50 — Arthropathic psoriasis", type:"text"},
@@ -414,12 +416,12 @@ const SCEN = {
       {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 04/22/2026", type:"text"}
     ],
     approve:{auth:"ESI-SP-31178", note:"12-month authorization · dispensed via Accredo specialty pharmacy"},
-    cdex:{net:"hsx", netName:"HSX", source:"Jefferson Rheumatology (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Jefferson Rheumatology (Epic)",
       docs:["Medication history — methotrexate 20mg, 16 weeks, inadequate response (DocumentReference/med-7740)","Rheumatology progress note"],
       authPrefix:"ESI", note:"Step therapy requirement satisfied by retrieved medication history — approved."}
   },
   vision: {
-    label:"Scleral Contact Lenses, keratoconus", code:"V2531", paRequired:true,
+    label:"Scleral Contact Lenses, keratoconus", code:"V2531", paRequired:true, emr:"Oracle",
     um:"davis", umName:"Davis", umRole:"Vision",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"H18.601 — Keratoconus, unspecified, right eye", type:"text"},
@@ -430,12 +432,12 @@ const SCEN = {
     ],
     approve:{auth:"DVS-MN-44892", note:"Medically necessary lenses · 1 pair per year · in-network provider"},
     pend:{ref:"DVS-P-44893", note:"Pended — awaiting corneal topography"},
-    cdex:{net:"hsx", netName:"HSX", source:"Wills Eye Hospital (Epic)",
+    cdex:{net:"hsx", netName:"HSX", source:"Wills Eye Hospital (Oracle)",
       docs:["Pentacam corneal tomography — Kmax 58.1D (DocumentReference/eye-1184)"],
       authPrefix:"DVS", note:"Topography retrieved from Wills Eye — medically necessary lenses approved."}
   },
   pet: {
-    label:"PET/CT Staging, oncologic", code:"CPT 78815", paRequired:true,
+    label:"PET/CT Staging, oncologic", code:"CPT 78815", paRequired:true, emr:"Epic", epp:true,
     um:"evicore", umName:"eviCore", umRole:"Oncology Imaging",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — Malignant neoplasm, upper lobe, right lung", type:"text"},
@@ -449,12 +451,12 @@ const SCEN = {
       {c:"Staging not yet established by prior imaging"},
       {c:"Result will change management"}]},
     approve:{auth:"EVC-ONC-512204", note:"Valid 45 days · Sidney Kimmel Cancer Center · single staging study"},
-    cdex:{net:"hsx", netName:"HSX", source:"Sidney Kimmel Cancer Center (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Sidney Kimmel Cancer Center (Epic)",
       docs:["Surgical pathology — adenocarcinoma, CT-guided biopsy RUL (DocumentReference/path-3382)"],
       authPrefix:"EVC", note:"Tissue diagnosis retrieved from SKCC — staging PET/CT approved on re-adjudication."}
   },
   immuno: {
-    label:"Keytruda (pembrolizumab)", code:"J9271", paRequired:true,
+    label:"Keytruda (pembrolizumab)", code:"J9271", paRequired:true, emr:"Epic", epp:true,
     um:"evicore", umName:"eviCore", umRole:"Medical Oncology",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, right upper lobe, Stage IV", type:"text"},
@@ -468,12 +470,12 @@ const SCEN = {
       {c:"EGFR / ALK negative (no targetable driver)", key:true},
       {c:"ECOG performance status 0–2"}]},
     approve:{auth:"EVC-ONC-512788", note:"Authorized ×4 cycles · re-review at restaging · dispensed via SKCC infusion"},
-    cdex:{net:"hsx", netName:"HSX", source:"SKCC Molecular Pathology (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"SKCC Molecular Pathology (Epic)",
       docs:["Biomarker report — PD-L1 TPS 65%, EGFR wild-type, ALK negative (DocumentReference/mol-7741)","NGS panel result"],
       authPrefix:"EVC", note:"PD-L1 high, no targetable driver — NCCN criteria met, denial overturned and pembrolizumab approved."}
   },
   imrt: {
-    label:"IMRT Radiation Therapy", code:"CPT 77385", paRequired:true,
+    label:"IMRT Radiation Therapy", code:"CPT 77385", paRequired:true, emr:"Epic", epp:true,
     um:"evicore", umName:"eviCore", umRole:"Radiation Oncology",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, right upper lobe", type:"text"},
@@ -487,12 +489,12 @@ const SCEN = {
       {c:"Dose/fractionation within guideline range"},
       {c:"Curative or definitive intent established"}]},
     approve:{auth:"EVC-RO-330145", note:"Full course authorized · 30 fractions · Bodine Center for Radiation Oncology"},
-    cdex:{net:"hsx", netName:"HSX", source:"SKCC Radiation Oncology (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"SKCC Radiation Oncology (Epic)",
       docs:["IMRT treatment plan + DVH, cord max 42 Gy (DocumentReference/ro-9912)","CT simulation report"],
       authPrefix:"EVC", note:"Plan confirms OAR sparing requirement — IMRT approved on re-adjudication."}
   },
   genomic: {
-    label:"Comprehensive Genomic Profiling", code:"CPT 81455", paRequired:true,
+    label:"Comprehensive Genomic Profiling", code:"CPT 81455", paRequired:true, emr:"Epic", epp:true,
     um:"evicore", umName:"eviCore", umRole:"Lab Management",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"C34.11 — NSCLC, Stage IV (metastatic)", type:"text"},
@@ -506,12 +508,12 @@ const SCEN = {
       {c:"Results will inform therapy selection"},
       {c:"Not previously profiled on same specimen"}]},
     approve:{auth:"EVC-LAB-771032", note:"One assay authorized · results to guide targeted therapy / trial eligibility"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Sidney Kimmel Cancer Center (Epic)",
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Sidney Kimmel Cancer Center (Epic)",
       docs:["Staging summary — Stage IV, M1b (DocumentReference/stg-2204)","PET/CT staging report"],
       authPrefix:"EVC", note:"Metastatic disease confirmed — genomic profiling approved on re-adjudication."}
   },
   pcs: {
-    label:"Personal Care Services", code:"HCPCS T1019", paRequired:true,
+    label:"Personal Care Services", code:"HCPCS T1019", paRequired:true, emr:"eCW",
     um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"I69.351 — Hemiplegia following cerebral infarction", type:"text"},
@@ -525,12 +527,12 @@ const SCEN = {
       {c:"ADL/IADL dependencies support requested hours"},
       {c:"Person-centered plan of care signed"}]},
     approve:{auth:"ELG-LTSS-60441", note:"25 hrs/week authorized · 6-month span · reassessment at renewal"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"BAYADA Home Health Care",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"BAYADA Home Health Care (eCW)",
       docs:["Functional needs assessment — ADL score 18/28, requires assist with bathing/transfer/toileting (DocumentReference/fna-7780)","Person-centered plan of care, signed"],
       authPrefix:"ELG", note:"Assessment retrieved from home care agency — personal care hours approved on re-adjudication."}
   },
   pdn: {
-    label:"Private Duty Nursing", code:"HCPCS T1000", paRequired:true,
+    label:"Private Duty Nursing", code:"HCPCS T1000", paRequired:true, emr:"Oracle",
     um:"elligint", umName:"Elligint Health — Helios", umRole:"LTSS",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"J96.10 — Chronic respiratory failure · tracheostomy-dependent", type:"text"},
@@ -544,12 +546,12 @@ const SCEN = {
       {c:"Care cannot be safely met by lower level of service", key:true},
       {c:"Caregiver training/backup plan documented"}]},
     approve:{auth:"ELG-PDN-60892", note:"16 hrs/day authorized · 90-day span · concurrent review"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Pulmonary / Trach Clinic (Epic)",
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Jefferson Pulmonary / Trach Clinic (Oracle)",
       docs:["Physician order — vent/trach management, 16h skilled nursing (DocumentReference/ord-4410)","Pulmonology progress note · trach-dependent"],
       authPrefix:"ELG", note:"Skilled need confirmed by physician order — private duty nursing approved on re-adjudication."}
   },
   cmr: {
-    label:"Cardiac MRI (Epic)", code:"CPT 75561", paRequired:true, epp:true,
+    label:"Cardiac MRI (Epic)", code:"CPT 75561", paRequired:true, epp:true, emr:"Epic",
     um:"evicore", umName:"eviCore", umRole:"Cardiology Imaging",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"I42.0 — Dilated cardiomyopathy", type:"text"},
@@ -564,7 +566,7 @@ const SCEN = {
       authPrefix:"EVC", note:"Echo with reduced EF retrieved from Epic via EPP — cardiac MRI approved on re-adjudication."}
   },
   hha: {
-    label:"Skilled Home Health (Epic)", code:"HCPCS G0299", paRequired:true, epp:true,
+    label:"Skilled Home Health (Epic)", code:"HCPCS G0299", paRequired:true, epp:true, emr:"Epic",
     um:"mhk", umName:"MHK", umRole:"Core UM / Home Health",
     questionnaire:[
       {id:"dx", q:"Primary diagnosis", prefill:"I50.9 — Heart failure, unspecified", type:"text"},
@@ -646,8 +648,9 @@ async function signOrder(){
   const key=$("orderSel").value, s=SCEN[key];
   state={key, s, answers:{}};
   $("signBtn").disabled=true;
+  $("emrTag").innerHTML = `Source EHR System: <b style="color:var(--ink)">${s.emr}</b>` + (s.epp ? ` · ePA submission &amp; data exchange via <b style="color:var(--ink)">Epic Payer Platform (EPP)</b>` : ` · ePA via PAS · CDex over HIE/IHE`);
   memberStep(1);
-  trace(`<span class="sys">[EHR→CRD]</span> CDS Hooks <b>order-sign</b> fired · ${s.label} (${s.code}) · Patient/JHP-88451203`);
+  trace(`<span class="sys">[${s.emr}→CRD]</span> CDS Hooks <b>order-sign</b> fired in <b>${s.emr}</b> · ${s.label} (${s.code}) · Patient/JHP-88451203`);
   setApi("crd","active");
   await sleep(900);
   if(!s.paRequired){
@@ -862,8 +865,9 @@ function updateQueue(id, status, cls){
 function resetFlow(){
   ["crd","dtr","pas"].forEach(k=>setApi(k,""));
   document.querySelectorAll(".um").forEach(u=>u.classList.remove("routed"));
-  ["net-ehx","net-hsx","net-epp"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
+  ["net-ehx","net-hsx","net-epp","net-ihe"].forEach(n=>{const e=$(n); if(e) e.classList.remove("routed");});
   $("crdCard").innerHTML=""; $("dtrStatus").innerHTML=""; $("ehrDecision").innerHTML="";
+  const et=$("emrTag"); if(et) et.innerHTML="";
   memberReset();
 }
 function resetDemo(){
