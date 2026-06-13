@@ -216,27 +216,30 @@
       <h3 class="sec">New Order</h3>
       <div class="order-row">
         <select id="orderSel">
-          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148 · eCW</option>
-          <option value="bh">Behavioral Health IOP — H0015 · Oracle</option>
-          <option value="dental">Dental Crown, porcelain/ceramic — D2740 · eCW</option>
-          <option value="tka">Total Knee Arthroplasty — CPT 27447 · eCW</option>
-          <option value="pt">Physical Therapy ×12 visits — CPT 97110 · Epic</option>
-          <option value="cpap">CPAP Device (DME) — E0601 · Oracle</option>
-          <option value="rx">Skyrizi (risankizumab) — J2327 · Epic</option>
-          <option value="vision">Scleral Contact Lenses, keratoconus — V2531 · Oracle</option>
-          <optgroup label="── Oncology ──">
-          <option value="pet">PET/CT Staging, oncologic — CPT 78815 · Epic</option>
-          <option value="immuno">Keytruda (pembrolizumab) — J9271 · Epic</option>
-          <option value="imrt">IMRT Radiation Therapy — CPT 77385 · Epic</option>
-          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455 · Epic</option>
+          <optgroup label="──  Epic  (ePA + write-back via EPP)  ──">
+          <option value="pt">Physical Therapy ×12 visits — CPT 97110</option>
+          <option value="rx">💊 Skyrizi (risankizumab) — J2327 · pharmacy</option>
+          <option value="ozempic">💊 Ozempic (semaglutide) — Rx · pharmacy</option>
+          <option value="pet">PET/CT Staging, oncologic — CPT 78815</option>
+          <option value="immuno">Keytruda (pembrolizumab) — J9271</option>
+          <option value="imrt">IMRT Radiation Therapy — CPT 77385</option>
+          <option value="genomic">Comprehensive Genomic Profiling — CPT 81455</option>
+          <option value="cmr">Cardiac MRI — CPT 75561</option>
+          <option value="hha">Skilled Home Health — HCPCS G0299</option>
           </optgroup>
-          <optgroup label="── LTSS (Elligint Helios) ──">
-          <option value="pcs">Personal Care Services — HCPCS T1019 · eCW</option>
-          <option value="pdn">Private Duty Nursing — HCPCS T1000 · Oracle</option>
+          <optgroup label="──  eCW  (write-back via eHealth Exchange)  ──">
+          <option value="mri">MRI Lumbar Spine w/o contrast — CPT 72148</option>
+          <option value="dental">Dental Crown, porcelain/ceramic — D2740</option>
+          <option value="tka">Total Knee Arthroplasty — CPT 27447</option>
+          <option value="humira">💊 Humira (adalimumab) — Rx · pharmacy</option>
+          <option value="pcs">Personal Care Services — HCPCS T1019</option>
           </optgroup>
-          <optgroup label="── Epic EMR via EPP ──">
-          <option value="cmr">Cardiac MRI — CPT 75561 · Epic</option>
-          <option value="hha">Skilled Home Health — HCPCS G0299 · Epic</option>
+          <optgroup label="──  Oracle  (write-back via eHealth Exchange)  ──">
+          <option value="bh">Behavioral Health IOP — H0015</option>
+          <option value="cpap">CPAP Device (DME) — E0601</option>
+          <option value="dupixent">💊 Dupixent (dupilumab) — Rx · pharmacy</option>
+          <option value="vision">Scleral Contact Lenses, keratoconus — V2531</option>
+          <option value="pdn">Private Duty Nursing — HCPCS T1000</option>
           </optgroup>
         </select>
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
@@ -629,6 +632,62 @@ const SCEN = {
     cdex:{net:"epp", netName:"Epic Payer Platform", source:"Regional Home Health (Epic)",
       docs:["Physician certification of homebound status (DocumentReference/hh-3361)","Signed plan of care (CMS-485)"],
       authPrefix:"MHK", note:"Homebound certification + plan of care retrieved from Epic via EPP — home health approved on re-adjudication."}
+  },
+  ozempic: {
+    label:"Ozempic (semaglutide)", code:"Rx — semaglutide", paRequired:true, emr:"Epic", epp:true,
+    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"E11.65 — Type 2 diabetes with hyperglycemia", type:"text"},
+      {id:"a1c", q:"Most recent A1C", prefill:"8.4% (lab 05/20/2026)", type:"text"},
+      {id:"step", q:"Tried metformin ≥ 3 months (or contraindicated)?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Formulary step therapy not met. Per ESI National Preferred Formulary (CMS-0062 ePA), a ≥ 3-month metformin trial is required before a GLP-1 agonist for Type 2 diabetes."}
+    ],
+    interqual:{engine:"ESI Formulary", set:"ESI National Preferred Formulary — GLP-1 step therapy (CMS-0062)", criteria:[
+      {c:"Type 2 diabetes diagnosis on file", key:true},
+      {c:"Metformin trial ≥ 3 months documented", key:true},
+      {c:"A1C above goal (≥ 7%)"}]},
+    approve:{auth:"ESI-RX-50231", note:"12-month authorization · 30-day fills · dispensed via in-network pharmacy"},
+    cdex:{net:"epp", netName:"Epic Payer Platform", source:"Jefferson Endocrinology (Epic)",
+      docs:["Medication history — metformin 1000mg BID, 6 months (DocumentReference/med-8801)","A1C trend flowsheet"],
+      authPrefix:"ESI", note:"Metformin trial retrieved from Epic via EPP — step therapy met, semaglutide approved."}
+  },
+  humira: {
+    label:"Humira (adalimumab)", code:"Rx — adalimumab", paRequired:true, emr:"eCW",
+    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"K50.90 — Crohn's disease, unspecified", type:"text"},
+      {id:"step", q:"Tried and failed conventional therapy (e.g., corticosteroids / immunomodulator)?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Formulary step therapy not met. Per ESI formulary (CMS-0062 ePA), a documented trial/failure of conventional therapy is required before a TNF inhibitor."},
+      {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 04/30/2026", type:"text"}
+    ],
+    interqual:{engine:"ESI Formulary", set:"ESI National Preferred Formulary — TNF-inhibitor step therapy (CMS-0062)", criteria:[
+      {c:"Qualifying inflammatory diagnosis", key:true},
+      {c:"Conventional therapy tried and failed", key:true},
+      {c:"Negative TB screen documented"}]},
+    approve:{auth:"ESI-RX-50498", note:"12-month authorization · specialty pharmacy dispensing"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"GI Specialists of Philadelphia (eCW)",
+      docs:["Medication history — budesonide + azathioprine, 5 months, inadequate response (DocumentReference/med-8890)","GI consult note"],
+      authPrefix:"ESI", note:"Conventional therapy failure retrieved via eHealth Exchange — step therapy met, adalimumab approved."}
+  },
+  dupixent: {
+    label:"Dupixent (dupilumab)", code:"Rx — dupilumab", paRequired:true, emr:"Oracle",
+    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"L20.9 — Atopic dermatitis, unspecified", type:"text"},
+      {id:"sev", q:"Moderate-to-severe disease uncontrolled on topical therapy (≥ 2 agents)?", type:"yn", drives:true,
+        yes:"approve", no:"pend",
+        pendReason:"Per ESI formulary (CMS-0062 ePA), dupilumab requires documented moderate-to-severe disease and inadequate response to topical therapy. Pended for records."}
+    ],
+    interqual:{engine:"ESI Formulary", set:"ESI National Preferred Formulary — biologic step therapy (CMS-0062)", criteria:[
+      {c:"Moderate-to-severe atopic dermatitis documented", key:true},
+      {c:"Inadequate response to ≥ 2 topical agents", key:true},
+      {c:"Prescribed by or with dermatology"}]},
+    approve:{auth:"ESI-RX-50712", note:"12-month authorization · specialty pharmacy dispensing"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Dermatology Associates (Oracle)",
+      docs:["Topical therapy history — high-potency steroid + tacrolimus, inadequate control (DocumentReference/med-8920)","Dermatology progress note · EASI 24"],
+      authPrefix:"ESI", note:"Topical therapy failure retrieved via eHealth Exchange — dupilumab approved on re-adjudication."}
   },
 };
 
