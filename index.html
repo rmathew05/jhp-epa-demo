@@ -26,6 +26,8 @@
   .btn.ghost:hover{background:#eaf3fb;}
   .btn.ghost.on{background:#fde8c2; color:#9a6700; border-color:#9a6700;}
   #nextStepBtn{background:#1e7e45;} #nextStepBtn:hover{background:#176235;}
+  body.direct-off #directSection{display:none;}
+  body.direct-off .ccd-action{display:none;}
   .layout{display:grid; grid-template-columns:1.1fr 1.1fr .85fr; gap:14px; padding:14px; max-width:1500px; margin:0 auto; position:relative;}
   .layout.no-member{grid-template-columns:1fr 1.5fr;}
   .layout.no-member .member{display:none;}
@@ -187,7 +189,8 @@
   <div class="logo">JHP <span>| Interoperability Hub | ePA workflow representation</span></div>
   <div class="tag">Da Vinci CRD · DTR · PAS · CDex</div>
   <div class="tag">CMS-0057-F</div>
-  <button class="btn ghost" id="memberToggle" style="margin-left:auto" onclick="toggleMember()">👤 Member view: On</button>
+  <button class="btn ghost" id="directToggle" style="margin-left:auto" onclick="toggleDirect()">📤 DIRECT workflow: On</button>
+  <button class="btn ghost" id="memberToggle" onclick="toggleMember()">👤 Member view: On</button>
   <button class="btn ghost" id="stepToggle" onclick="toggleStep()">⏭ Step mode: Off</button>
   <button class="btn" id="nextStepBtn" style="display:none" onclick="doNext()">Next ▶</button>
   <button class="btn reset" onclick="startGuided()">▶ Guided demo</button>
@@ -265,11 +268,13 @@
         <div class="api" id="api-pas"><div class="nm">PAS</div><div class="ds">Prior Auth Support</div></div>
       </div>
 
+      <div id="directSection">
       <h3 class="sec">Inbound Clinical Data — DIRECT → FHIR</h3>
       <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="um" id="dm-direct"><b>DIRECT Messaging</b><span class="role">Secure email · receives C-CDA / CCD from provider</span></div>
         <div class="um" id="dm-xform"><b>CDA → FHIR Transform</b><span class="role">C-CDA parsed &amp; mapped to FHIR R4 resources</span></div>
         <div class="um" id="dm-fhir"><b>FHIR Repository</b><span class="role">Payer FHIR store · prefill source for DTR</span></div>
+      </div>
       </div>
 
       <h3 class="sec">UM Routing</h3>
@@ -289,7 +294,7 @@
 
       <h3 class="sec">Clinical Data Exchange — Da Vinci CDex or IHE</h3>
       <div class="um-grid" style="grid-template-columns:repeat(2,1fr)">
-        <div class="um" id="net-ehx"><b>eHX — eHealth Exchange</b><span class="role">National network · CDex Task / XCA · pulls data from provider EHRs · proxy SMART-on-FHIR write-back to non-Epic EMRs</span></div>
+        <div class="um" id="net-ehx"><b>eHX — eHealth Exchange / JHP Smart_on_FHIR App</b><span class="role">National network · CDex Task / XCA · pulls data from provider EHRs · proxy SMART-on-FHIR write-back to non-Epic EMRs</span></div>
         <div class="um" id="net-epp"><b>EPP — Epic Payer Platform</b><span class="role">Epic-to-payer · native data exchange + ePA submission for Epic EMRs</span></div>
       </div>
       <div id="cdexAction" style="margin-top:8px"></div>
@@ -835,6 +840,19 @@ function gate(ms){
 function doNext(){ if(gateResolve){ const r=gateResolve; gateResolve=null; showNext(false); r(); } }
 function showNext(on){ const b=$("nextStepBtn"); if(b) b.style.display = on ? "inline-block" : "none"; }
 function clearGate(){ gateResolve=null; showNext(false); }
+let directOn = true;
+function toggleDirect(){
+  directOn = !directOn;
+  document.body.classList.toggle("direct-off", !directOn);
+  const b=$("directToggle");
+  b.textContent = directOn ? "📤 DIRECT workflow: On" : "📤 DIRECT workflow: Off";
+  b.classList.toggle("on", !directOn);
+  if(!directOn){ // turning off: drop any CCD ingestion state
+    ccdIngested=false;
+    ["dm-direct","dm-xform","dm-fhir"].forEach(id=>{const e=$(id); if(e) e.classList.remove("routed");});
+    renderFlows();
+  }
+}
 function toggleMember(){
   const lay=document.querySelector(".layout");
   const off=lay.classList.toggle("no-member");
@@ -906,9 +924,11 @@ async function signOrder(){
   trace(`<span class="sys">[CRD→EHR]</span> Card returned: <span class="warn">Prior authorization REQUIRED</span> · policy ref attached · DTR launch link included`);
   $("crdCard").innerHTML=`<div class="card crd"><span class="badge req">PA REQUIRED</span>
     <h4 style="margin-top:8px">${s.label} requires prior authorization</h4>
-    <p>JHP coverage policy applies. Send the patient's CCD via DIRECT to prefill documentation, then launch the DTR questionnaire.</p>
-    <button class="btn ghost" id="ccdBtn" onclick="sendCcd()">📤 Send CCD via DIRECT</button>
-    <span id="ccdStatus" style="font-size:11.5px;color:var(--muted);margin-left:6px"></span>
+    <p>JHP coverage policy applies. ${directOn ? "Send the patient's CCD via DIRECT to prefill documentation, then launch the DTR questionnaire." : "Launch the DTR questionnaire to collect required documentation — most answers prefill from the chart."}</p>
+    <div class="ccd-action">
+      <button class="btn ghost" id="ccdBtn" onclick="sendCcd()">📤 Send CCD via DIRECT</button>
+      <span id="ccdStatus" style="font-size:11.5px;color:var(--muted);margin-left:6px"></span>
+    </div>
     <div style="margin-top:10px"><button class="btn" onclick="openDtr()">Launch DTR Questionnaire ➜</button></div></div>`;
 }
 
