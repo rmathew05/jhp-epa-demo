@@ -217,6 +217,11 @@
         <div class="kv"><span id="provLabel">PCP</span><br><span id="provVal">Dr. R. Patel, Jefferson Internal Medicine</span></div>
       </div>
 
+      <div style="margin-bottom:12px">
+        <button class="btn ghost" id="ccdBtn" onclick="sendCcd()">📤 Send patient CCD via DIRECT</button>
+        <span id="ccdStatus" style="font-size:11.5px;color:var(--muted);margin-left:8px"></span>
+      </div>
+
       <h3 class="sec">New Order</h3>
       <div class="order-row">
         <select id="orderSel">
@@ -263,6 +268,13 @@
         <div class="api" id="api-crd"><div class="nm">CRD</div><div class="ds">Coverage Requirements Discovery</div></div>
         <div class="api" id="api-dtr"><div class="nm">DTR</div><div class="ds">Documentation Templates &amp; Rules</div></div>
         <div class="api" id="api-pas"><div class="nm">PAS</div><div class="ds">Prior Auth Support</div></div>
+      </div>
+
+      <h3 class="sec">Inbound Clinical Data — DIRECT → FHIR</h3>
+      <div class="um-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="um" id="dm-direct"><b>DIRECT Messaging</b><span class="role">Secure email · receives C-CDA / CCD from provider</span></div>
+        <div class="um" id="dm-xform"><b>CDA → FHIR Transform</b><span class="role">C-CDA parsed &amp; mapped to FHIR R4 resources</span></div>
+        <div class="um" id="dm-fhir"><b>FHIR Repository</b><span class="role">Payer FHIR store · prefill source for DTR</span></div>
       </div>
 
       <h3 class="sec">UM Routing</h3>
@@ -330,7 +342,7 @@
   <div class="modal">
     <div class="modal-head">
       <h3 id="dtrTitle">DTR — Documentation Questionnaire</h3>
-      <p>SMART on FHIR app · launched from EHR · answers prefilled from chart via CQL</p>
+      <p id="dtrPrefillNote">SMART on FHIR app · launched from EHR · answers prefilled from chart via CQL</p>
     </div>
     <div class="modal-body">
       <div class="note">✦ Fields marked <b style="color:var(--green)">prefilled</b> were auto-populated from the patient's FHIR record — the provider only confirms.</div>
@@ -845,6 +857,32 @@ function toggleStep(){
 }
 function setApi(id, mode){ const e=$("api-"+id); e.classList.remove("active","done","pulse"); if(mode) e.classList.add(mode); if(mode==="active") e.classList.add("pulse"); }
 
+/* ---------- CCD via DIRECT → CDA→FHIR → FHIR repo → DTR prefill ---------- */
+const C_DIRECT = "#0e7490"; // cyan for the DIRECT/FHIR ingestion workflow
+let ccdIngested = false;
+async function sendCcd(){
+  const b=$("ccdBtn"); b.disabled=true; b.textContent="📤 Sending CCD…";
+  $("ccdStatus").textContent="";
+  // Provider → DIRECT
+  $("dm-direct").classList.add("routed"); addFlow("#ccdBtn","#dm-direct",C_DIRECT);
+  trace(`<span class="sys">[Provider→DIRECT]</span> C-CDA (CCD R2.1) sent via <b>DIRECT secure messaging</b> to the payer DIRECT address`);
+  await gate(900);
+  // DIRECT → CDA→FHIR transform
+  $("dm-xform").classList.add("routed"); addFlow("#dm-direct","#dm-xform",C_DIRECT);
+  trace(`<span class="sys">[DIRECT→Transform]</span> CDA captured · parsed and mapped to FHIR R4 (Patient, Condition, MedicationStatement, Observation, Procedure)`);
+  await gate(900);
+  // Transform → FHIR repository
+  $("dm-fhir").classList.add("routed"); addFlow("#dm-xform","#dm-fhir",C_DIRECT);
+  trace(`<span class="ok">[Transform→FHIR Repo]</span> FHIR resources persisted to the payer FHIR repository`);
+  await gate(900);
+  // FHIR repo → DTR (prefill source)
+  addFlow("#dm-fhir","#api-dtr",C_DIRECT);
+  trace(`<span class="sys">[FHIR Repo→DTR]</span> DTR prefill source ready · CQL will draw from these FHIR resources`);
+  ccdIngested=true;
+  $("ccdStatus").innerHTML='<b style="color:var(--green)">✓ CCD ingested → FHIR repo will prefill DTR</b>';
+  b.textContent="📤 CCD sent via DIRECT"; b.disabled=true;
+}
+
 async function signOrder(){
   resetFlow();
   const key=$("orderSel").value, s=SCEN[key];
@@ -881,8 +919,17 @@ function openDtr(){
   const s=state.s;
   setApi("dtr","active");
   addFlow("#api-crd","#api-dtr",C_API);
-  trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR retrieves Questionnaire + CQL prefill rules (Documentation Templates &amp; Rules)`);
+  if(ccdIngested){
+    ["dm-direct","dm-xform","dm-fhir"].forEach(id=>$(id).classList.add("routed"));
+    addFlow("#dm-fhir","#api-dtr",C_DIRECT);
+    trace(`<span class="sys">[FHIR Repo→DTR]</span> DTR prefilled from the <b>payer FHIR repository</b> (CCD received via DIRECT, transformed to FHIR)`);
+  } else {
+    trace(`<span class="sys">[EHR→DTR]</span> SMART on FHIR launch · DTR retrieves Questionnaire + CQL prefill rules (Documentation Templates &amp; Rules)`);
+  }
   $("dtrTitle").textContent=`DTR — ${s.label}`;
+  $("dtrPrefillNote").textContent = ccdIngested
+    ? "SMART on FHIR app · prefilled from the payer FHIR repository (CCD via DIRECT → CDA→FHIR)"
+    : "SMART on FHIR app · launched from EHR · answers prefilled from chart via CQL";
   let html="";
   s.questionnaire.forEach(q=>{
     html+=`<div class="q"><label>${q.q}${q.prefill?'<span class="prefill">✓ prefilled</span>':""}</label>`;
@@ -1121,6 +1168,11 @@ function resetDemo(){
   $("signBtn").disabled=false;
   metrics.total=metrics.touchless=metrics.cdex=metrics.savedHrs=0; renderMetrics();
   skinForCurrentOrder();
+  // reset CCD/DIRECT ingestion workflow
+  ccdIngested=false;
+  ["dm-direct","dm-xform","dm-fhir"].forEach(id=>{const e=$(id); if(e) e.classList.remove("routed");});
+  const cb=$("ccdBtn"); if(cb){ cb.disabled=false; cb.textContent="📤 Send patient CCD via DIRECT"; }
+  const cs=$("ccdStatus"); if(cs) cs.innerHTML="";
 }
 
 /* ---------- GUIDED DEMO ---------- */
