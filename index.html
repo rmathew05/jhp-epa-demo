@@ -183,15 +183,15 @@
   }
 </style>
 </head>
-<body>
+<body class="direct-off">
 
 <header>
   <div class="logo">JHP <span>| Interoperability Hub | ePA workflow representation</span></div>
   <div class="tag">Da Vinci CRD · DTR · PAS · CDex</div>
   <div class="tag">CMS-0057-F</div>
-  <button class="btn ghost" id="directToggle" style="margin-left:auto" onclick="toggleDirect()">📤 DIRECT workflow: On</button>
-  <button class="btn ghost" id="memberToggle" onclick="toggleMember()">👤 Member view: On</button>
-  <button class="btn ghost" id="stepToggle" onclick="toggleStep()">⏭ Step mode: Off</button>
+  <button class="btn ghost on" id="directToggle" style="margin-left:auto" onclick="toggleDirect()">📤 DIRECT workflow: Off</button>
+  <button class="btn ghost on" id="memberToggle" onclick="toggleMember()">👤 Member view: Off</button>
+  <button class="btn ghost on" id="stepToggle" onclick="toggleStep()">⏭ Step mode: On</button>
   <button class="btn" id="nextStepBtn" style="display:none" onclick="doNext()">Next ▶</button>
   <button class="btn reset" onclick="startGuided()">▶ Guided demo</button>
   <button class="btn ghost" onclick="resetDemo()">↺ Reset</button>
@@ -206,7 +206,7 @@
   <div class="metric"><div class="v" id="m-saved">0<small> hrs</small></div><div class="l">Provider time saved</div></div>
 </div>
 
-<div class="layout">
+<div class="layout no-member">
 
   <!-- PROVIDER EHR -->
   <div class="panel ehr" id="ehrPanel">
@@ -831,7 +831,7 @@ function trace(msg, cls=""){
 }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 /* ---------- STEP MODE: gate each stage on a Next click ---------- */
-let stepMode=false, gateResolve=null;
+let stepMode=true, gateResolve=null;
 const HOP_MS = 2000; // 2-second pause between each hop in auto-play
 function gate(ms){
   if(stepMode){ return new Promise(res=>{ gateResolve=res; showNext(true); }); }
@@ -840,7 +840,7 @@ function gate(ms){
 function doNext(){ if(gateResolve){ const r=gateResolve; gateResolve=null; showNext(false); r(); } }
 function showNext(on){ const b=$("nextStepBtn"); if(b) b.style.display = on ? "inline-block" : "none"; }
 function clearGate(){ gateResolve=null; showNext(false); }
-let directOn = true;
+let directOn = false;
 function toggleDirect(){
   directOn = !directOn;
   document.body.classList.toggle("direct-off", !directOn);
