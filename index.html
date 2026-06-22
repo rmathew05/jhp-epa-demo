@@ -237,6 +237,7 @@
           <option value="tka">🩻 Total Knee Arthroplasty — CPT 27447</option>
           <option value="hha">🏥 Skilled Home Health — HCPCS G0299</option>
           <option value="humira">💊 Humira (adalimumab) — Rx · pharmacy</option>
+          <option value="enbrel">💊 Enbrel (etanercept) — Rx · pharmacy</option>
           <option value="pcs">🏠 Personal Care Services — HCPCS T1019</option>
           </optgroup>
           <optgroup label="──  Oracle  (write-back via eHealth Exchange)  ──">
@@ -285,6 +286,7 @@
         <div class="um" id="um-avesis"><b>🦷 Avesis</b><span class="role">Dental</span></div>
         <div class="um" id="um-mhk"><b>🏥 MHK</b><span class="role">Core UM · Epic Tapestry in 2028</span></div>
         <div class="um" id="um-esi"><b>💊 ESI (CMS-0062)</b><span class="role">Pharmacy</span></div>
+        <div class="um" id="um-cmm"><b>💊 CoverMyMeds</b><span class="role">Pharmacy ePA network · medication PA</span></div>
         <div class="um" id="um-davis"><b>👁️ Davis</b><span class="role">Vision</span></div>
         <div class="um" id="um-elligint"><b>🏠 Helios (Elligint Health)</b><span class="role">LTSS · Long-Term Services &amp; Supports</span></div>
       </div>
@@ -689,6 +691,21 @@ const SCEN = {
     cdex:{net:"ehx", netName:"eHealth Exchange", source:"Dermatology Associates (Oracle)",
       docs:["Topical therapy history — high-potency steroid + tacrolimus, inadequate control (DocumentReference/med-8920)","Dermatology progress note · EASI 24"],
       authPrefix:"ESI", note:"Topical therapy failure retrieved via eHealth Exchange — dupilumab approved on re-adjudication."}
+  },
+  enbrel: {
+    label:"Enbrel (etanercept)", code:"Rx — etanercept", paRequired:true, emr:"eCW",
+    um:"cmm", umName:"CoverMyMeds", umRole:"Pharmacy ePA",
+    questionnaire:[
+      {id:"dx", q:"Primary diagnosis", prefill:"M06.9 — Rheumatoid arthritis, unspecified", type:"text"},
+      {id:"step", q:"Tried and failed methotrexate ≥ 3 months?", type:"yn", drives:true,
+        yes:"approve", no:"deny",
+        denyReason:"Step therapy not met. Per formulary, a conventional DMARD trial (methotrexate ≥ 3 months) is required before a TNF inhibitor. Submit the trial via the CoverMyMeds ePA request."},
+      {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 05/10/2026", type:"text"}
+    ],
+    approve:{auth:"CMM-RX-44820", note:"12-month authorization · CoverMyMeds ePA · specialty pharmacy dispensing"},
+    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Rheumatology Associates (eCW)",
+      docs:["Medication history — methotrexate 20mg, 14 weeks, inadequate response (DocumentReference/med-9930)","Rheumatology progress note"],
+      authPrefix:"CMM", note:"Methotrexate trial retrieved via eHealth Exchange — step therapy met, etanercept approved through CoverMyMeds."}
   },
 };
 
