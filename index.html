@@ -68,6 +68,7 @@
   .decision .kv{font-size:12.5px; margin-top:3px;}
   .decision .kv span{font-weight:700;}
   /* payer side */
+  .hub-inner{border:1.5px solid var(--jhp-blue); border-radius:10px; background:#f4f8fd; padding:13px;}
   .api-rail{display:flex; gap:10px; margin-bottom:14px;}
   .api{flex:1; border:1.5px solid var(--line); border-radius:8px; padding:10px; text-align:center; transition:all .3s;}
   .api .nm{font-weight:700; font-size:14px;}
@@ -263,6 +264,7 @@
   <div class="panel payer">
     <div class="panel-head"><span class="ttl">☁️ JHP Azure Interoperability Hub</span><span class="sub">Workflow at payer with delegated vendors</span></div>
     <div class="panel-body">
+      <div class="hub-inner">
       <div class="api-rail">
         <div class="api" id="api-crd"><div class="nm">JHP - CRD</div><div class="ds">Coverage Requirements Discovery</div></div>
         <div class="api" id="api-dtr"><div class="nm">JHP - DTR</div><div class="ds">Documentation Templates &amp; Rules</div></div>
@@ -303,6 +305,7 @@
 
       <h3 class="sec">PAS Intake Queue</h3>
       <div id="queue"><div class="empty">No prior auth requests yet.</div></div>
+      </div>
     </div>
   </div>
 
