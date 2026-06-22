@@ -920,9 +920,19 @@ async function signOrder(){
   $("signBtn").disabled=true;
   $("emrTag").innerHTML = `Source EHR System: <b style="color:var(--ink)">${s.emr}</b>` + (s.epp ? ` · ePA submission &amp; data exchange via <b style="color:var(--ink)">Epic Payer Platform (EPP)</b>` : ` · ePA via PAS · CDex over HIE/IHE`);
   memberStep(1);
-  trace(`<span class="sys">[${s.emr}→CRD]</span> CDS Hooks <b>order-sign</b> fired in <b>${s.emr}</b> · ${s.label} (${s.code}) · Patient/JHP-88451203`);
   setApi("crd","active");
-  addFlow("#signBtn","#api-crd",C_API);
+  if(s.epp){
+    // Epic EMR: the order is submitted natively to EPP first, then EPP pushes it to JHP CRD
+    $("net-epp").classList.add("routed");
+    addFlow("#signBtn","#net-epp",C_UM);
+    trace(`<span class="sys">[Epic→EPP]</span> <b>order-sign</b> · ${s.label} (${s.code}) submitted natively from <b>Epic</b> to <b>Epic Payer Platform (EPP)</b>`);
+    await gate(900);
+    addFlow("#net-epp","#api-crd",C_UM);
+    trace(`<span class="sys">[EPP→CRD]</span> EPP pushes the order into <b>JHP CRD</b> · Coverage Requirements Discovery runs`);
+  } else {
+    addFlow("#signBtn","#api-crd",C_API);
+    trace(`<span class="sys">[${s.emr}→CRD]</span> CDS Hooks <b>order-sign</b> fired in <b>${s.emr}</b> · ${s.label} (${s.code}) · Patient/JHP-88451203`);
+  }
   await gate(900);
   if(!s.paRequired){
     setApi("crd","done");
