@@ -238,7 +238,6 @@
           <option value="tka">🩻 Total Knee Arthroplasty — CPT 27447</option>
           <option value="hha">🏥 Skilled Home Health — HCPCS G0299</option>
           <option value="humira">💊 Humira (adalimumab) — Rx · pharmacy</option>
-          <option value="enbrel">💊 Enbrel (etanercept) — Rx · pharmacy</option>
           <option value="pcs">🏠 Personal Care Services — HCPCS T1019</option>
           </optgroup>
           <optgroup label="──  Oracle  (write-back via eHealth Exchange)  ──">
@@ -253,8 +252,6 @@
         <button class="btn" id="signBtn" onclick="signOrder()">Sign Order</button>
       </div>
       <div id="emrTag" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
-
-      <div class="um" id="prov-cmm" style="margin-top:10px"><b>💊 CoverMyMeds</b><span class="role">Provider ePA portal · initiate medication prior auth from the EHR</span></div>
 
       <div id="crdCard"></div>
       <div id="dtrStatus"></div>
@@ -696,21 +693,6 @@ const SCEN = {
     cdex:{net:"ehx", netName:"eHealth Exchange", source:"Dermatology Associates (Oracle)",
       docs:["Topical therapy history — high-potency steroid + tacrolimus, inadequate control (DocumentReference/med-8920)","Dermatology progress note · EASI 24"],
       authPrefix:"ESI", note:"Topical therapy failure retrieved via eHealth Exchange — dupilumab approved on re-adjudication."}
-  },
-  enbrel: {
-    label:"Enbrel (etanercept)", code:"Rx — etanercept", paRequired:true, emr:"eCW",
-    um:"esi", umName:"ESI (CMS-0062)", umRole:"Pharmacy", portal:"CoverMyMeds",
-    questionnaire:[
-      {id:"dx", q:"Primary diagnosis", prefill:"M06.9 — Rheumatoid arthritis, unspecified", type:"text"},
-      {id:"step", q:"Tried and failed methotrexate ≥ 3 months?", type:"yn", drives:true,
-        yes:"approve", no:"deny",
-        denyReason:"Step therapy not met. Per formulary, a conventional DMARD trial (methotrexate ≥ 3 months) is required before a TNF inhibitor. Resubmit the trial via the CoverMyMeds ePA portal."},
-      {id:"tb", q:"TB screening result", prefill:"QuantiFERON negative, 05/10/2026", type:"text"}
-    ],
-    approve:{auth:"ESI-RX-44820", note:"12-month authorization · initiated via CoverMyMeds portal · specialty pharmacy dispensing"},
-    cdex:{net:"ehx", netName:"eHealth Exchange", source:"Rheumatology Associates (eCW)",
-      docs:["Medication history — methotrexate 20mg, 14 weeks, inadequate response (DocumentReference/med-9930)","Rheumatology progress note"],
-      authPrefix:"ESI", note:"Methotrexate trial retrieved via eHealth Exchange — step therapy met, etanercept approved."}
   },
 };
 
